@@ -28,6 +28,7 @@ export function initSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       trace_id TEXT UNIQUE NOT NULL,
       instance_id TEXT NOT NULL,
+     projectid TEXT NOT NULL,
       method TEXT NOT NULL,
       path TEXT NOT NULL,
       status_code INTEGER,
