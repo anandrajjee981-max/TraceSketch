@@ -2,7 +2,7 @@ import { db } from "../config/db";
 import crypto from 'crypto';
 
 function generateuuid(): string {
-  return `TB_${crypto.randomUUID().replace(/-/g, '').toUpperCase()}`;
+  return `TS_${crypto.randomUUID().replace(/-/g, '').toUpperCase()}`;
 }
 
 export function checkInstanceExists(instanceId: string): boolean {
@@ -11,7 +11,7 @@ export function checkInstanceExists(instanceId: string): boolean {
 }
 
 export function generateTraceId(): string {
-  return  "ts_"+ generateuuid();
+  return   generateuuid();
 }
 
 export function insertTrace(
@@ -39,4 +39,14 @@ export function insertTrace(
     console.error(err);
     return false;
   }
+}
+
+export function getTrace(traceid:string){
+const res = db.prepare('SELECT * FROM traces WHERE trace_id = ?').get(traceid)
+return res 
+}
+
+export function getallTrace(){
+  const res = db.prepare('SELECT * FROM traces').all()
+  return res 
 }

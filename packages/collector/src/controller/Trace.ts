@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { checkInstanceExists, generateTraceId, insertTrace } from "../dao/trace.dao";
+import { checkInstanceExists, generateTraceId, insertTrace,getTrace,getallTrace } from "../dao/trace.dao";
 
 export async function createTrace(req: Request, res: Response) {
   try {
@@ -46,3 +46,28 @@ export async function createTrace(req: Request, res: Response) {
     res.status(500).json({ message: "internal server error" });
   }
 }
+
+export async function gettrace(req: Request, res: Response) {
+  try {
+    const { traceId } = req.params;
+    const trace = getTrace(traceId);
+    if (!trace) {
+      return res.status(404).json({ message: "trace not found" });
+    }
+    res.status(200).json({ message: "trace found", trace: trace });
+  } catch (err) {
+    res.status(500).json({ message: "internal server error" });
+  }
+}
+
+
+export async function getalltrace(req :Request,res:Response){
+  try{
+const traces = getallTrace();
+res.status(200).json({ message: "traces found", traces: traces });
+  }
+  catch(err){
+    res.status(500).json({ message: "internal server error" });
+  }
+}
+

@@ -3,10 +3,10 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 
-const TRACEBOX_DIR = path.join(os.homedir(), '.tracebox');
-const DB_PATH = path.join(TRACEBOX_DIR, 'tracebox.db');
+const TRACEBOX_DIR = path.join(os.homedir(), '.tracesketch');
+const DB_PATH = path.join(TRACEBOX_DIR, 'tracesketch.db');
 
-// Ensure ~/.tracebox/ folder exists
+// Ensure ~/.tracesketch/ folder exists
 if (!fs.existsSync(TRACEBOX_DIR)) {
   fs.mkdirSync(TRACEBOX_DIR, { recursive: true });
 }
@@ -28,7 +28,6 @@ export function initSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       trace_id TEXT UNIQUE NOT NULL,
       instance_id TEXT NOT NULL,
-     projectid TEXT NOT NULL,
       method TEXT NOT NULL,
       path TEXT NOT NULL,
       status_code INTEGER,
