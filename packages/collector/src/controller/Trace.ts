@@ -1,17 +1,23 @@
 import { Request, Response } from "express";
-import { checkInstanceExists, generateTraceId, insertTrace,getTrace,getallTrace } from "../dao/trace.dao";
+import { checkInstanceExists, generateTraceId, insertTrace,getTrace,getallTrace, checkhashsecret } from "../dao/trace.dao";
 
 export async function createTrace(req: Request, res: Response) {
   try {
     const instanceId = req.headers['x-instance-id'] as string;
+    const instanceSecret = req.headers['x-instance-secret'] as string;
 
-    if (!instanceId) {
-      return res.status(400).json({ message: "x-instance-id header is required" });
+    if (!instanceId || !instanceSecret) {
+      return res.status(400).json({ message: "x-instance-id and x-instance-secret headers are required" });
     }
 
     const instanceExists = checkInstanceExists(instanceId);
     if (!instanceExists) {
       return res.status(404).json({ message: "Unknown instance" });
+    }
+   
+    const secretValid = checkhashsecret(instanceId, instanceSecret);
+    if (!secretValid) {
+      return res.status(401).json({ message: "Invalid instance secret" });
     }
 
     const { path, method, status_code, duration, environment } = req.body;
@@ -23,6 +29,7 @@ export async function createTrace(req: Request, res: Response) {
     const traceId = generateTraceId();
     const createdAt = Date.now();
     const expiresAt = createdAt + 86400000; // 24 hours
+   
 
     const success = insertTrace(
       traceId,
@@ -33,6 +40,7 @@ export async function createTrace(req: Request, res: Response) {
       duration,
       environment ?? "local",
       createdAt,
+     
       expiresAt
     );
 

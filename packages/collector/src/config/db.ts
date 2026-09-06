@@ -34,6 +34,9 @@ export function initSchema() {
       duration_ms INTEGER,
       environment TEXT,
       created_at INTEGER NOT NULL,
+      request_body TEXT,
+      query_params TEXT,
+      request_headers TEXT,  
       expires_at INTEGER
     );
 

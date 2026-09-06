@@ -165,7 +165,8 @@ npm run dev
 to check instance file cretaed or not 
 cat ~/.tracesketch/config/instance.json
 
-
+to get instance secret 
+type "%USERPROFILE%\.tracesketch\config\instance.json"
 
 
 

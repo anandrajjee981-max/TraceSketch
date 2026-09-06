@@ -9,10 +9,17 @@ export function checkInstanceExists(instanceId: string): boolean {
   const row = db.prepare('SELECT * FROM instances WHERE instance_id = ?').get(instanceId);
   return !!row;
 }
+export function checkhashsecret(instanceId: string, rawSecret: string): boolean {
+  const hashedInput = crypto.createHash('sha256').update(rawSecret).digest('hex');
+  const row = db.prepare('SELECT * FROM instances WHERE instance_id = ? AND secret_hash = ?').get(instanceId, hashedInput);
+  return !!row;
+}
 
 export function generateTraceId(): string {
   return   generateuuid();
 }
+
+
 
 export function insertTrace(
   traceId: string,
@@ -22,6 +29,7 @@ export function insertTrace(
   statusCode: number,
   durationMs: number,
   environment: string,
+  
   createdAt: number,
   expiresAt: number
 ): boolean {

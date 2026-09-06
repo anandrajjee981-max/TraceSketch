@@ -4,5 +4,14 @@
   "version": "0.0.1",
   "workspaces": [
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=@tracesketch/collector\" \"npm run dev --workspace=@tracesketch/dashboard\"",
+    "dev:collector": "npm run dev --workspace=@tracesketch/collector",
+    "dev:dashboard": "npm run dev --workspace=@tracesketch/dashboard",
+    "build": "npm run build --workspaces"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
 }
