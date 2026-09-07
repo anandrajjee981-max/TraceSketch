@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { checkInstanceExists, generateTraceId, insertTrace,getTrace,getallTrace, checkhashsecret } from "../dao/trace.dao";
+import {redactSensitiveData} from '../utils/redact'
 
 export async function createTrace(req: Request, res: Response) {
   try {
@@ -20,7 +21,15 @@ export async function createTrace(req: Request, res: Response) {
       return res.status(401).json({ message: "Invalid instance secret" });
     }
 
-    const { path, method, status_code, duration, environment } = req.body;
+       const { path, method, status_code, duration, environment, request_body, query_params, request_headers } = req.body;
+
+    // Redact sensitive data from headers, body, and queryParams
+    const redactedHeaders = redactSensitiveData(request_headers);
+    const redactedBody = redactSensitiveData(request_body);
+    const redactedQueryParams = redactSensitiveData(query_params);
+       const headersJson = JSON.stringify(redactedHeaders ? redactedHeaders : {});
+   const bodyJson = JSON.stringify(redactedBody ? redactedBody : {});
+   const queryJson = JSON.stringify(redactedQueryParams ? redactedQueryParams : {});
 
     if (!path || !method) {
       return res.status(400).json({ message: "method and path are required" });
@@ -31,18 +40,20 @@ export async function createTrace(req: Request, res: Response) {
     const expiresAt = createdAt + 86400000; // 24 hours
    
 
-    const success = insertTrace(
-      traceId,
-      instanceId,
-      method,
-      path,
-      status_code,
-      duration,
-      environment ?? "local",
-      createdAt,
-     
-      expiresAt
-    );
+ const success = insertTrace(
+  traceId,
+  instanceId,
+  method,
+  path,
+  status_code,
+  duration,
+  environment ?? "local",
+  bodyJson,       // request_body
+  queryJson,      // query_params
+  headersJson,    // request_headers
+  createdAt,
+  expiresAt
+);
 
     if (!success) {
       return res.status(500).json({ message: "Failed to save trace" });

@@ -29,18 +29,21 @@ export function insertTrace(
   statusCode: number,
   durationMs: number,
   environment: string,
-  
+  body: string,
+  queryParams: string,
+  headers: string,
   createdAt: number,
   expiresAt: number
 ): boolean {
   try {
+ 
     const sql = `
-      INSERT INTO traces 
-      (trace_id, instance_id, method, path, status_code, duration_ms, environment, created_at, expires_at) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     INSERT INTO traces 
+(trace_id, instance_id, method, path, status_code, duration_ms, environment, request_body, query_params, request_headers, created_at, expires_at) 
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     db.prepare(sql).run(
-      traceId, instanceId, method, path, statusCode, durationMs, environment, createdAt, expiresAt
+      traceId, instanceId, method, path, statusCode, durationMs, environment, body, queryParams, headers, createdAt, expiresAt
     );
     return true;
   } catch (err) {
