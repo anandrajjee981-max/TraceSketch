@@ -29,14 +29,14 @@ export function insertTraceEvent(
 export function getEventDurations(traceId: string): any[] {
     const sql = `SELECT duration_ms FROM trace_events WHERE trace_id = ?`;
     const stmt = db.prepare(sql);
-    const rows = stmt.all(traceId);
-    return rows.map(row => row.duration_ms);
+    const rows = stmt.all(traceId) as any[];
+    return rows.map((row: any) => row.duration_ms);
   } 
 
   export function getTraceEvents(traceId: string): any[] {
     const sql = `SELECT * FROM trace_events WHERE trace_id = ?`;
     const stmt = db.prepare(sql);
-    const rows = stmt.all(traceId);
+    const rows = stmt.all(traceId) as any[];
     return rows;
   }
   

@@ -36,3 +36,25 @@ export interface TimelineResponse {
   message: string;
   events: TraceEvent[];
 }
+
+export interface ReplayRun {
+  id: number;
+  trace_id: string;
+  target_base_url: string;
+  environment: string | null;
+  status_code: number | null;
+  duration_ms: number | null;
+  result: string | null;
+  created_at: number;
+}
+
+export interface ReplaysResponse {
+  message: string;
+  replays: ReplayRun[];
+}
+
+export interface ReplayResult {
+  message: string;
+  original: { status_code: number; duration_ms: number };
+  replay: { status_code: number; duration_ms: number };
+}

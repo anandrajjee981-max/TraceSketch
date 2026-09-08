@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getTrace, getTimeline } from "../api/client";
+import { getTrace, getTimeline, replayTrace } from "../api/client";
 import type { Trace, TraceEvent } from "../types";
 import { StatusBadge } from "../components/StatusBadge";
 import { Breadcrumbs } from "../components/Breadcrumbs";
@@ -20,7 +20,13 @@ export function TraceDetail() {
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [errorTrace, setErrorTrace] = useState<string | null>(null);
   const [errorEvents, setErrorEvents] = useState<string | null>(null);
-  const [replayToast, setReplayToast] = useState(false);
+
+  // Replay states
+  const [showReplayForm, setShowReplayForm] = useState(false);
+  const [targetBaseUrl, setTargetBaseUrl] = useState("");
+  const [replayLoading, setReplayLoading] = useState(false);
+  const [replayError, setReplayError] = useState<string | null>(null);
+  const [replayResult, setReplayResult] = useState<{ original: { status_code: number; duration_ms: number }; replay: { status_code: number; duration_ms: number } } | null>(null);
 
   useEffect(() => {
     if (!decodedId) return;
@@ -59,6 +65,28 @@ export function TraceDetail() {
       cancelled = true;
     };
   }, [decodedId, instanceId, apiBaseUrl]);
+
+  const handleReplaySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!trace) return;
+    const trimmed = targetBaseUrl.trim();
+    if (!trimmed) {
+      setReplayError("Target Base URL is required");
+      return;
+    }
+    setReplayLoading(true);
+    setReplayError(null);
+    try {
+      const res = await replayTrace(trace.trace_id, trimmed, { instanceId, apiBaseUrl });
+      setReplayResult({ original: res.original, replay: res.replay });
+      setReplayError(null);
+    } catch (err) {
+      setReplayError(err instanceof Error ? err.message : String(err));
+      setReplayResult(null);
+    } finally {
+      setReplayLoading(false);
+    }
+  };
 
   if (loadingTrace) {
     return (
@@ -111,7 +139,7 @@ export function TraceDetail() {
     <div className="space-y-4">
       <Breadcrumbs items={[{ label: "Traces", to: "/" }, { label: trace.trace_id.slice(0, 12) + "…" }]} />
 
-      {/* Header panel */}
+      {/* Header panel — request summary (read-only) */}
       <Panel>
         <div className="p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -191,38 +219,96 @@ export function TraceDetail() {
 
             <button
               onClick={() => {
-                setReplayToast(true);
-                setTimeout(() => setReplayToast(false), 2500);
+                setShowReplayForm((v) => !v);
+                setReplayError(null);
               }}
-              className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-[5px] text-[13px] font-semibold transition-colors"
+              disabled={replayLoading}
+              className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-[5px] text-[13px] font-semibold transition-colors disabled:opacity-60"
               style={{
                 background: "var(--accent)",
                 color: "#ffffff",
                 border: "none",
-                cursor: "pointer",
+                cursor: replayLoading ? "wait" : "pointer",
                 boxShadow: "var(--shadow-sm)",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--accent-hover)";
+                if (!replayLoading) e.currentTarget.style.background = "var(--accent-hover)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "var(--accent)";
+                if (!replayLoading) e.currentTarget.style.background = "var(--accent)";
               }}
             >
-              ▶ Replay
+              {replayLoading ? "Replaying..." : "▶ Replay"}
             </button>
           </div>
 
-          {replayToast && (
-            <div
-              className="mt-3 text-[12px] rounded-[5px] px-3 py-2 font-medium"
-              style={{
-                background: "var(--green-bg)",
-                border: "1px solid var(--green-border)",
-                color: "var(--green)",
-              }}
-            >
-              Replay is coming soon — this is a placeholder.
+          {showReplayForm && (
+            <form onSubmit={handleReplaySubmit} className="mt-3 flex flex-wrap gap-2 items-end">
+              <div className="flex-1 min-w-[220px]">
+                <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
+                  Target Base URL
+                </label>
+                <input
+                  value={targetBaseUrl}
+                  onChange={(e) => setTargetBaseUrl(e.target.value)}
+                  placeholder="http://localhost:5000"
+                  className="w-full px-3 font-mono text-[13px]"
+                  style={{
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-primary)",
+                    borderRadius: "6px",
+                    fontSize: "13px",
+                    height: "32px",
+                    outline: "none",
+                  }}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={replayLoading}
+                className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-[5px] text-[13px] font-semibold disabled:opacity-60"
+                style={{
+                  background: "var(--accent)",
+                  color: "#ffffff",
+                  border: "none",
+                  cursor: replayLoading ? "wait" : "pointer",
+                  height: "32px",
+                }}
+              >
+                {replayLoading ? "Replaying..." : "Send Replay"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowReplayForm(false)}
+                className="shrink-0 px-3 py-2 rounded-[5px] text-[13px] font-medium"
+                style={{
+                  background: "var(--bg-surface-2)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                  height: "32px",
+                }}
+              >
+                Cancel
+              </button>
+            </form>
+          )}
+
+          {replayError && (
+            <div className="mt-3 text-[12px]" style={{ color: "var(--red)" }}>
+              {replayError}
+            </div>
+          )}
+
+          {replayResult && (
+            <div className="mt-3 flex gap-4 text-[12px] flex-wrap" style={{ color: "var(--text-primary)" }}>
+              <div>
+                <span style={{ color: "var(--text-dim)" }}>original</span> status_code: {replayResult.original.status_code} duration_ms: {replayResult.original.duration_ms}
+              </div>
+              <div>
+                <span style={{ color: "var(--text-dim)" }}>replay</span> status_code: {replayResult.replay.status_code} duration_ms: {replayResult.replay.duration_ms}
+              </div>
             </div>
           )}
         </div>

@@ -68,7 +68,7 @@ export async function createTrace(req: Request, res: Response) {
 
 export async function gettrace(req: Request, res: Response) {
   try {
-    const { traceId } = req.params;
+    const traceId = Array.isArray(req.params.traceId) ? req.params.traceId[0] : req.params.traceId;
     const trace = getTrace(traceId);
     if (!trace) {
       return res.status(404).json({ message: "trace not found" });

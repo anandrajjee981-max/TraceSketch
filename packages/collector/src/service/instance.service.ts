@@ -43,6 +43,15 @@ function createNewInstance(): InstanceConfig {
 export function getOrCreateInstance(): InstanceConfig {
   const existing = readInstanceFile();
   if (existing) {
+    const row = db.prepare('SELECT instance_id FROM instances WHERE instance_id = ?').get(existing.instance_id);
+    if (!row) {
+      const secretHash = crypto.createHash('sha256').update(existing.secret).digest('hex');
+      db.prepare('INSERT INTO instances (instance_id, secret_hash, created_at) VALUES (?, ?, ?)').run(
+        existing.instance_id,
+        secretHash,
+        Date.now()
+      );
+    }
     return existing;
   }
   return createNewInstance();

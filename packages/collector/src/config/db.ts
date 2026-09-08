@@ -11,7 +11,7 @@ if (!fs.existsSync(TRACEBOX_DIR)) {
   fs.mkdirSync(TRACEBOX_DIR, { recursive: true });
 }
 
-export const db = new Database(DB_PATH);
+export const db: any = new Database(DB_PATH);
 
 db.pragma('journal_mode = WAL');
 
@@ -50,5 +50,29 @@ export function initSchema() {
       metadata TEXT,
       created_at INTEGER NOT NULL
     );
+CREATE TABLE IF NOT EXISTS replay_runs(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  trace_id TEXT NOT NULL,
+  target_base_url TEXT NOT NULL,   
+  environment TEXT,
+  status_code INTEGER,
+  duration_ms INTEGER,
+  result TEXT,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS regression_tests (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+source_trace_id TEXT NOT NULL,
+name TEXT NOT NULL,
+expected_status INTEGER,
+expected_schema TEXT NOT NULL,
+created_at INTEGER NOT NULL
+
+)
+
+
+
+
   `);
 }

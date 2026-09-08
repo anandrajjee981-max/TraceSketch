@@ -2,7 +2,7 @@ import { insertTraceEvent,checktraceidExists ,getEventDurations ,getTraceEvents}
 import { Request, Response } from "express";
 export async function createEvents(req:Request , res:Response){
 try{
-let traceId = req.params.traceId
+let traceId = Array.isArray(req.params.traceId) ? req.params.traceId[0] : req.params.traceId
 const check = await checktraceidExists(traceId)
 if(!check){
     return res.status(404).json({
@@ -37,7 +37,7 @@ message:"internal server error"
 
 export async function getDurations(req:Request , res:Response){
     try{
-        let traceId = req.params.traceId
+        let traceId = Array.isArray(req.params.traceId) ? req.params.traceId[0] : req.params.traceId
         const check = await checktraceidExists(traceId)
         if(!check){
             return res.status(404).json({
@@ -58,7 +58,7 @@ export async function getDurations(req:Request , res:Response){
 
 export async function getTraceEventsHandler(req: Request, res: Response) {
     try {
-        let traceId = req.params.traceId;
+        let traceId = Array.isArray(req.params.traceId) ? req.params.traceId[0] : req.params.traceId;
         const check = await checktraceidExists(traceId);
         if (!check) {
             return res.status(404).json({

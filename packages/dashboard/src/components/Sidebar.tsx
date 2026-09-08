@@ -11,6 +11,17 @@ function IconTraces({ active }: { active?: boolean }) {
   );
 }
 
+function IconReplay({ active }: { active?: boolean }) {
+  const stroke = active ? "var(--accent)" : "var(--text-dim)";
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0">
+      <path d="M8 13.5A5.5 5.5 0 1 0 3.2 7.2" stroke={stroke} strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M3.2 3.5v3.7H6.9" stroke={stroke} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6.2 8L8.2 10L11.5 6.2" stroke={stroke} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function IconSettings({ active }: { active?: boolean }) {
   const stroke = active ? "var(--accent)" : "var(--text-dim)";
   return (
@@ -109,6 +120,29 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             >
               <IconTraces active={isActive} />
               {!collapsed && "Traces"}
+            </span>
+          )}
+        </NavLink>
+
+        <NavLink to="/replays" style={{ textDecoration: "none" }}>
+          {({ isActive }: { isActive: boolean }) => (
+            <span
+              style={navItemStyle(isActive)}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  (e.currentTarget as HTMLSpanElement).style.background = "var(--bg-surface-3)";
+                  (e.currentTarget as HTMLSpanElement).style.color = "var(--text-primary)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  (e.currentTarget as HTMLSpanElement).style.background = "transparent";
+                  (e.currentTarget as HTMLSpanElement).style.color = "var(--text-secondary)";
+                }
+              }}
+            >
+              <IconReplay active={isActive} />
+              {!collapsed && "Replays"}
             </span>
           )}
         </NavLink>

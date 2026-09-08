@@ -3,6 +3,7 @@ import cors from "cors";
 import { initSchema } from "./config/db";
 import { getOrCreateInstance } from "./service/instance.service";
 import tracerouter from "./routes/trace.routes";
+import replayrouter from "./routes/replay.route";
 import eventsRouter from "./routes/events.routes";
 
 const app = express();
@@ -38,6 +39,7 @@ app.get("/instance", (_req, res) => {
   res.json({ instance_id: instance.instance_id });
 });
 
+app.use("/traces", replayrouter);
 app.use("/traces", tracerouter);
 app.use("/traces", eventsRouter);
 
