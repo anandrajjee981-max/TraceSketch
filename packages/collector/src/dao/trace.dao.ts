@@ -45,7 +45,7 @@ export function insertTrace(
     db.prepare(sql).run(
       traceId, instanceId, method, path, statusCode, durationMs, environment, body, queryParams, headers, createdAt, expiresAt
     );
-    return true;
+    return true; 
   } catch (err) {
     console.error(err);
     return false;
@@ -55,7 +55,7 @@ export function insertTrace(
 export function getTrace(traceid:string){
 const res = db.prepare('SELECT * FROM traces WHERE trace_id = ?').get(traceid)
 return res 
-}
+} 
 
 export function getallTrace(){
   const res = db.prepare('SELECT * FROM traces').all()
