@@ -66,7 +66,7 @@ id INTEGER PRIMARY KEY AUTOINCREMENT,
 source_trace_id TEXT NOT NULL,
 name TEXT NOT NULL,
 expected_status INTEGER,
-expected_schema TEXT NOT NULL,
+expected_schema TEXT ,
 created_at INTEGER NOT NULL
 
 )
@@ -75,4 +75,30 @@ created_at INTEGER NOT NULL
 
 
   `);
+
+  const regressionColumns = db
+    .pragma('table_info(regression_tests)')
+    .map((column: { name: string }) => column.name);
+  const requiredRegressionColumns = [
+    'id',
+    'source_trace_id',
+    'name',
+    'expected_status',
+    'expected_schema',
+    'created_at',
+  ];
+
+  if (!requiredRegressionColumns.every((column) => regressionColumns.includes(column))) {
+    db.exec('ALTER TABLE regression_tests RENAME TO regression_tests_legacy');
+    db.exec(`
+      CREATE TABLE regression_tests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_trace_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        expected_status INTEGER,
+        expected_schema TEXT,
+        created_at INTEGER NOT NULL
+      )
+    `);
+  }
 }

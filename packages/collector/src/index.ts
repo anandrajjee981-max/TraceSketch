@@ -5,6 +5,7 @@ import { getOrCreateInstance } from "./service/instance.service";
 import tracerouter from "./routes/trace.routes";
 import replayrouter from "./routes/replay.route";
 import eventsRouter from "./routes/events.routes";
+import regressionrouter from "./routes/regression.route";
 
 const app = express();
 
@@ -42,6 +43,7 @@ app.get("/instance", (_req, res) => {
 app.use("/traces", replayrouter);
 app.use("/traces", tracerouter);
 app.use("/traces", eventsRouter);
+app.use("/traces",regressionrouter)
 
 app.listen(PORT, () => {
   console.log(`Collector listening on http://localhost:${PORT}`);
