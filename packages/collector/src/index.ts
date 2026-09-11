@@ -6,6 +6,8 @@ import tracerouter from "./routes/trace.routes";
 import replayrouter from "./routes/replay.route";
 import eventsRouter from "./routes/events.routes";
 import regressionrouter from "./routes/regression.route";
+import cron from 'node-cron';
+import { cleanExpiredTraces } from "./dao/trace.dao";
 
 const app = express();
 
@@ -45,6 +47,11 @@ app.use("/traces", tracerouter);
 app.use("/traces", eventsRouter);
 app.use("/traces",regressionrouter)
 
+cron.schedule('0 */2 * * *', () => {
+  console.log('Running hourly trace cleanup task...');
+  const count = cleanExpiredTraces();
+  console.log(`Cleanup finished: Removed ${count} expired records.`);
+});
 app.listen(PORT, () => {
   console.log(`Collector listening on http://localhost:${PORT}`);
 });

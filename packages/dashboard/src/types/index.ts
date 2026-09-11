@@ -58,3 +58,23 @@ export interface ReplayResult {
   original: { status_code: number; duration_ms: number };
   replay: { status_code: number; duration_ms: number };
 }
+
+export interface RegressionTest {
+  id: number;
+  source_trace_id: string;
+  name: string;
+  expected_status: number;
+  expected_schema?: string | null;
+  created_at: number;
+}
+
+export interface RegressionsResponse {
+  message: string;
+  regressions: RegressionTest[];
+}
+
+export interface RegressionRunResult {
+  message: string;
+  expected_status: number;
+  actual_status: number;
+}

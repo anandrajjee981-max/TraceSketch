@@ -40,8 +40,9 @@ export function getReplaysByTraceId(traceId: string): ReplayRunRow[] {
 }
 
 export function getAllReplays(limit = 100): ReplayRunRow[] {
+  // Hide orphaned replays where parent trace was TTL-deleted (pre-cascade DBs)
   return db
-    .prepare("SELECT * FROM replay_runs ORDER BY created_at DESC LIMIT ?")
+    .prepare("SELECT r.* FROM replay_runs r INNER JOIN traces t ON r.trace_id = t.trace_id ORDER BY r.created_at DESC LIMIT ?")
     .all(limit) as ReplayRunRow[];
 }
 

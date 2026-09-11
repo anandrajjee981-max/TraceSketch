@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { checkInstanceExists, generateTraceId, insertTrace,getTrace,getallTrace, checkhashsecret } from "../dao/trace.dao";
+import { checkInstanceExists, generateTraceId, insertTrace, getTrace, getAllTraces, checkhashsecret } from "../dao/trace.dao";
 import {redactSensitiveData} from '../utils/redact'
 
 export async function createTrace(req: Request, res: Response) {
@@ -82,7 +82,7 @@ export async function gettrace(req: Request, res: Response) {
 
 export async function getalltrace(req :Request,res:Response){
   try{
-const traces = getallTrace();
+const traces = getAllTraces();
 res.status(200).json({ message: "traces found", traces: traces });
   }
   catch(err){

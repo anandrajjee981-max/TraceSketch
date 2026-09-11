@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getTrace, getTimeline, replayTrace } from "../api/client";
-import type { Trace, TraceEvent } from "../types";
+import { getTrace, getTimeline, replayTrace, createRegression, getRegressions, runRegression } from "../api/client";
+import type { Trace, TraceEvent, RegressionTest } from "../types";
 import { StatusBadge } from "../components/StatusBadge";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { SkeletonDetail } from "../components/Skeleton";
@@ -27,6 +27,36 @@ export function TraceDetail() {
   const [replayLoading, setReplayLoading] = useState(false);
   const [replayError, setReplayError] = useState<string | null>(null);
   const [replayResult, setReplayResult] = useState<{ original: { status_code: number; duration_ms: number }; replay: { status_code: number; duration_ms: number } } | null>(null);
+
+  // Regression save states
+  const [showRegressionForm, setShowRegressionForm] = useState(false);
+  const [regName, setRegName] = useState("");
+  const [regExpected, setRegExpected] = useState<number>(200);
+  const [regSaving, setRegSaving] = useState(false);
+  const [regError, setRegError] = useState<string | null>(null);
+  const [regSavedMsg, setRegSavedMsg] = useState<string | null>(null);
+
+  // Regression list states
+  const [regressions, setRegressions] = useState<RegressionTest[]>([]);
+  const [loadingRegressions, setLoadingRegressions] = useState(false);
+  const [regListError, setRegListError] = useState<string | null>(null);
+
+  // Per-row run states
+  const [runForms, setRunForms] = useState<Record<number, { show: boolean; targetUrl: string; loading: boolean; error: string | null; result: { expected_status: number; actual_status: number; passed: boolean } | null }>>({});
+
+  const fetchRegressions = async () => {
+    if (!decodedId) return;
+    setLoadingRegressions(true);
+    setRegListError(null);
+    try {
+      const res = await getRegressions(decodedId, { instanceId, apiBaseUrl });
+      setRegressions(res.regressions ?? []);
+    } catch (e) {
+      setRegListError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingRegressions(false);
+    }
+  };
 
   useEffect(() => {
     if (!decodedId) return;
@@ -66,6 +96,12 @@ export function TraceDetail() {
     };
   }, [decodedId, instanceId, apiBaseUrl]);
 
+  useEffect(() => {
+    if (!decodedId) return;
+    fetchRegressions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [decodedId, instanceId, apiBaseUrl]);
+
   const handleReplaySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!trace) return;
@@ -85,6 +121,67 @@ export function TraceDetail() {
       setReplayResult(null);
     } finally {
       setReplayLoading(false);
+    }
+  };
+
+  const handleRegressionSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!trace) return;
+    const nameTrimmed = regName.trim();
+    if (!nameTrimmed) {
+      setRegError("Test Name is required");
+      return;
+    }
+    if (!Number.isFinite(regExpected)) {
+      setRegError("Expected Status Code is required");
+      return;
+    }
+    setRegSaving(true);
+    setRegError(null);
+    try {
+      await createRegression(trace.trace_id, nameTrimmed, Number(regExpected), { instanceId, apiBaseUrl });
+      setRegSavedMsg("Regression test saved");
+      setShowRegressionForm(false);
+      setRegName("");
+      setRegExpected(200);
+      // refresh list
+      fetchRegressions();
+      setTimeout(() => setRegSavedMsg(null), 3000);
+    } catch (err) {
+      setRegError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRegSaving(false);
+    }
+  };
+
+  const handleRunSubmit = async (e: React.FormEvent, regressionId: number) => {
+    e.preventDefault();
+    if (!trace) return;
+    const state = runForms[regressionId];
+    const trimmed = (state?.targetUrl ?? "").trim();
+    if (!trimmed) {
+      setRunForms((prev) => ({
+        ...prev,
+        [regressionId]: { ...(prev[regressionId] ?? { show: true, targetUrl: "", loading: false, error: null, result: null }), error: "Target Base URL is required", loading: false },
+      }));
+      return;
+    }
+    setRunForms((prev) => ({
+      ...prev,
+      [regressionId]: { ...(prev[regressionId] ?? { show: true, targetUrl: trimmed, loading: false, error: null, result: null }), loading: true, error: null, result: null },
+    }));
+    try {
+      const res = await runRegression(trace.trace_id, regressionId, trimmed, { instanceId, apiBaseUrl });
+      const passed = res.expected_status === res.actual_status;
+      setRunForms((prev) => ({
+        ...prev,
+        [regressionId]: { ...(prev[regressionId] ?? { show: true, targetUrl: trimmed, loading: false, error: null, result: null }), loading: false, result: { expected_status: res.expected_status, actual_status: res.actual_status, passed }, error: null },
+      }));
+    } catch (err) {
+      setRunForms((prev) => ({
+        ...prev,
+        [regressionId]: { ...(prev[regressionId] ?? { show: true, targetUrl: trimmed, loading: false, error: null, result: null }), loading: false, error: err instanceof Error ? err.message : String(err) },
+      }));
     }
   };
 
@@ -309,6 +406,263 @@ export function TraceDetail() {
               <div>
                 <span style={{ color: "var(--text-dim)" }}>replay</span> status_code: {replayResult.replay.status_code} duration_ms: {replayResult.replay.duration_ms}
               </div>
+            </div>
+          )}
+
+          {/* Save as Regression Test - below Replay */}
+          <div className="mt-4" style={{ borderTop: "1px solid var(--border-dim)", paddingTop: "12px" }}>
+            <button
+              onClick={() => {
+                setShowRegressionForm((v) => !v);
+                setRegError(null);
+              }}
+              disabled={regSaving}
+              className="inline-flex items-center px-3 py-1.5 rounded-[5px] text-[13px] font-medium disabled:opacity-60"
+              style={{
+                background: "var(--bg-surface-2)",
+                border: "1px solid var(--border)",
+                color: "var(--text-primary)",
+                cursor: regSaving ? "wait" : "pointer",
+              }}
+            >
+              Save as Regression Test
+            </button>
+
+            {regSavedMsg && (
+              <div className="mt-2 text-[12px]" style={{ color: "green" }}>
+                {regSavedMsg}
+              </div>
+            )}
+
+            {showRegressionForm && (
+              <form onSubmit={handleRegressionSave} className="mt-3 flex flex-wrap gap-2 items-end">
+                <div className="flex-1 min-w-[180px]">
+                  <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
+                    Test Name
+                  </label>
+                  <input
+                    value={regName}
+                    onChange={(e) => setRegName(e.target.value)}
+                    placeholder="My regression test"
+                    className="w-full px-3 text-[13px]"
+                    style={{
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border)",
+                      color: "var(--text-primary)",
+                      borderRadius: "6px",
+                      height: "32px",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+                <div className="w-[160px]">
+                  <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
+                    Expected Status Code
+                  </label>
+                  <input
+                    type="number"
+                    value={regExpected}
+                    onChange={(e) => setRegExpected(Number(e.target.value))}
+                    placeholder="200"
+                    className="w-full px-3 font-mono text-[13px]"
+                    style={{
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border)",
+                      color: "var(--text-primary)",
+                      borderRadius: "6px",
+                      height: "32px",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={regSaving}
+                  className="shrink-0 inline-flex items-center px-4 py-2 rounded-[5px] text-[13px] font-semibold disabled:opacity-60"
+                  style={{
+                    background: "var(--accent)",
+                    color: "#ffffff",
+                    border: "none",
+                    cursor: regSaving ? "wait" : "pointer",
+                    height: "32px",
+                  }}
+                >
+                  {regSaving ? "Saving..." : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowRegressionForm(false)}
+                  className="shrink-0 px-3 py-2 rounded-[5px] text-[13px] font-medium"
+                  style={{
+                    background: "var(--bg-surface-2)",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-secondary)",
+                    cursor: "pointer",
+                    height: "32px",
+                  }}
+                >
+                  Cancel
+                </button>
+              </form>
+            )}
+
+            {regError && (
+              <div className="mt-2 text-[12px]" style={{ color: "var(--red)" }}>
+                {regError}
+              </div>
+            )}
+          </div>
+        </div>
+      </Panel>
+
+      {/* Regression Tests list */}
+      <Panel>
+        <div className="p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
+              Regression Tests
+            </span>
+            <span className="text-[11px]" style={{ color: "var(--text-dim)" }}>
+              {regressions.length} test{regressions.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+
+          {loadingRegressions ? (
+            <div className="mt-3 text-[13px]" style={{ color: "var(--text-dim)" }}>
+              Loading...
+            </div>
+          ) : regListError ? (
+            <div className="mt-3 text-[12px]" style={{ color: "var(--red)" }}>
+              {regListError}
+            </div>
+          ) : regressions.length === 0 ? (
+            <div className="mt-3 text-[13px]" style={{ color: "var(--text-dim)" }}>
+              No regression tests yet.
+            </div>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {regressions.map((r) => {
+                const rowState = runForms[r.id] ?? { show: false, targetUrl: "", loading: false, error: null, result: null };
+                return (
+                  <div key={r.id} className="flex flex-wrap items-center gap-2 py-2" style={{ borderBottom: "1px solid var(--border-dim)" }}>
+                    <span className="text-[13px] font-medium" style={{ color: "var(--text-primary)" }}>
+                      {r.name}
+                    </span>
+                    <span className="text-[12px]" style={{ color: "var(--text-dim)" }}>
+                      Expected Status: {r.expected_status}
+                    </span>
+                    <span className="text-[12px] font-mono" style={{ color: "var(--text-dim)" }}>
+                      {new Date(r.created_at > 1e12 ? r.created_at : r.created_at * 1000).toLocaleString()}
+                    </span>
+                    <button
+                      onClick={() =>
+                        setRunForms((prev) => ({
+                          ...prev,
+                          [r.id]: { ...(prev[r.id] ?? { show: false, targetUrl: "", loading: false, error: null, result: null }), show: !prev[r.id]?.show, error: null },
+                        }))
+                      }
+                      className="ml-2 px-2.5 py-1 rounded-[4px] text-[12px] font-medium"
+                      style={{
+                        background: "var(--bg-surface-2)",
+                        border: "1px solid var(--border)",
+                        color: "var(--text-primary)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Run
+                    </button>
+
+                    {rowState.result && (
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className="inline-flex px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold"
+                          style={{
+                            background: rowState.result.passed ? "#dcfce7" : "#fee2e2",
+                            color: rowState.result.passed ? "#166534" : "#991b1b",
+                            border: `1px solid ${rowState.result.passed ? "#86efac" : "#fecaca"}`,
+                          }}
+                        >
+                          {rowState.result.passed ? "PASS" : "FAIL"}
+                        </span>
+                        <span className="text-[11px]" style={{ color: "gray" }}>
+                          expected: {rowState.result.expected_status}, actual: {rowState.result.actual_status}
+                        </span>
+                      </span>
+                    )}
+
+                    {rowState.error && (
+                      <span className="text-[11px]" style={{ color: "var(--red)" }}>
+                        {rowState.error}
+                      </span>
+                    )}
+
+                    {rowState.show && (
+                      <form
+                        onSubmit={(e) => handleRunSubmit(e, r.id)}
+                        className="w-full flex flex-wrap gap-2 items-end mt-1"
+                      >
+                        <div className="flex-1 min-w-[200px]">
+                          <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
+                            Target Base URL
+                          </label>
+                          <input
+                            value={rowState.targetUrl}
+                            onChange={(e) =>
+                              setRunForms((prev) => ({
+                                ...prev,
+                                [r.id]: { ...(prev[r.id] ?? { show: true, targetUrl: "", loading: false, error: null, result: null }), targetUrl: e.target.value },
+                              }))
+                            }
+                            placeholder="http://localhost:5000"
+                            className="w-full px-3 font-mono text-[13px]"
+                            style={{
+                              background: "var(--bg-surface)",
+                              border: "1px solid var(--border)",
+                              color: "var(--text-primary)",
+                              borderRadius: "6px",
+                              height: "32px",
+                              outline: "none",
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={rowState.loading}
+                          className="shrink-0 px-3 py-1.5 rounded-[5px] text-[13px] font-semibold disabled:opacity-60"
+                          style={{
+                            background: "var(--accent)",
+                            color: "#ffffff",
+                            border: "none",
+                            cursor: rowState.loading ? "wait" : "pointer",
+                            height: "32px",
+                          }}
+                        >
+                          {rowState.loading ? "Running..." : "Send"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setRunForms((prev) => ({
+                              ...prev,
+                              [r.id]: { ...(prev[r.id] ?? { show: true, targetUrl: "", loading: false, error: null, result: null }), show: false },
+                            }))
+                          }
+                          className="shrink-0 px-3 py-1.5 rounded-[5px] text-[13px] font-medium"
+                          style={{
+                            background: "var(--bg-surface-2)",
+                            border: "1px solid var(--border)",
+                            color: "var(--text-secondary)",
+                            cursor: "pointer",
+                            height: "32px",
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

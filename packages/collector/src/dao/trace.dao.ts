@@ -52,12 +52,37 @@ export function insertTrace(
   }
 }
 
-export function getTrace(traceid:string){
-const res = db.prepare('SELECT * FROM traces WHERE trace_id = ?').get(traceid)
-return res 
-} 
+// Helper function to check and delete a single trace if expired
+export function dropTrace(trace_id: string): boolean {
+  const record = db.prepare('SELECT expires_at FROM traces WHERE trace_id = ?').get(trace_id) as { expires_at: number } | undefined;
 
-export function getallTrace(){
-  const res = db.prepare('SELECT * FROM traces').all()
-  return res 
+  if (record && record.expires_at < Date.now()) {
+    db.prepare('DELETE FROM traces WHERE trace_id = ?').run(trace_id);
+    return true; // Trace was expired and deleted
+  }
+
+  return false; // Trace was not expired (or didn't exist)
+}
+
+// Single trace retrieval: checks expiry and deletes if expired
+export function getTrace(trace_id: string) {
+  const isExpired = dropTrace(trace_id);
+  if (isExpired) {
+    return null; // Return null since it was expired and deleted
+  }
+
+  return db.prepare('SELECT * FROM traces WHERE trace_id = ?').get(trace_id);
+}
+
+// Bulk retrieval: clears all expired traces first, then returns valid ones
+export function getAllTraces() {
+  // Clean up all expired traces in one query
+  db.prepare('DELETE FROM traces WHERE expires_at < ?').run(Date.now());
+
+  return db.prepare('SELECT * FROM traces').all();
+}
+
+export function cleanExpiredTraces(): number {
+  const info = db.prepare('DELETE FROM traces WHERE expires_at < ?').run(Date.now());
+  return info.changes; // Output status kitne records delete hue
 }

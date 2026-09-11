@@ -32,5 +32,13 @@ export function getRegressionsByTraceId(sourceTraceId: string) {
     .all(sourceTraceId);
 }
 
+export function getRegressionById(id: string) {
+  return db
+    .prepare("SELECT * FROM regression_tests WHERE id = ?")
+    .get(id);
+}
+
+
+
 
 

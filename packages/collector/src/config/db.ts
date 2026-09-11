@@ -13,6 +13,7 @@ if (!fs.existsSync(TRACEBOX_DIR)) {
 
 export const db: any = new Database(DB_PATH);
 
+db.pragma('foreign_keys = ON');
 db.pragma('journal_mode = WAL');
 
 export function initSchema() {
@@ -24,7 +25,7 @@ export function initSchema() {
       created_at INTEGER NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS traces (
+    CREATE TABLE IF NOT EXISTS traces ( 
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       trace_id TEXT UNIQUE NOT NULL,
       instance_id TEXT NOT NULL,
@@ -48,7 +49,8 @@ export function initSchema() {
       operation TEXT,
       duration_ms INTEGER,
       metadata TEXT,
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (trace_id) REFERENCES traces(trace_id) ON DELETE CASCADE
     );
 CREATE TABLE IF NOT EXISTS replay_runs(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,7 +60,8 @@ CREATE TABLE IF NOT EXISTS replay_runs(
   status_code INTEGER,
   duration_ms INTEGER,
   result TEXT,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (trace_id) REFERENCES traces(trace_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS regression_tests (
@@ -67,7 +70,8 @@ source_trace_id TEXT NOT NULL,
 name TEXT NOT NULL,
 expected_status INTEGER,
 expected_schema TEXT ,
-created_at INTEGER NOT NULL
+created_at INTEGER NOT NULL,
+FOREIGN KEY (source_trace_id) REFERENCES traces(trace_id) ON DELETE CASCADE
 
 )
 
@@ -97,8 +101,18 @@ created_at INTEGER NOT NULL
         name TEXT NOT NULL,
         expected_status INTEGER,
         expected_schema TEXT,
-        created_at INTEGER NOT NULL
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (source_trace_id) REFERENCES traces(trace_id) ON DELETE CASCADE
       )
     `);
   }
+
+  // purge orphans left from pre-FK DBs where CASCADE never ran (existing users)
+  try {
+    db.exec(`
+      DELETE FROM trace_events WHERE trace_id NOT IN (SELECT trace_id FROM traces);
+      DELETE FROM replay_runs WHERE trace_id NOT IN (SELECT trace_id FROM traces);
+      DELETE FROM regression_tests WHERE source_trace_id NOT IN (SELECT trace_id FROM traces);
+    `);
+  } catch {}
 }

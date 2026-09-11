@@ -1,4 +1,4 @@
-import type { TracesResponse, TraceResponse, TimelineResponse, ReplaysResponse, ReplayResult } from "../types";
+import type { TracesResponse, TraceResponse, TimelineResponse, ReplaysResponse, ReplayResult, RegressionsResponse, RegressionRunResult } from "../types";
 
 // Base is read at runtime: VITE_COLLECTOR_URL="" -> use relative via Vite proxy; else absolute.
 function getApiBase(): string {
@@ -90,6 +90,92 @@ export function getReplaysForTrace(
 export function getAllReplays(opts?: { instanceId?: string; apiBaseUrl?: string; limit?: number }): Promise<ReplaysResponse> {
   const q = opts?.limit ? `?limit=${opts.limit}` : "";
   return fetchJson<ReplaysResponse>(apiUrl(`/traces/replays${q}`, opts?.apiBaseUrl), opts?.instanceId);
+}
+
+// ---- Regression Tests ----
+export async function createRegression(
+  traceId: string,
+  name: string,
+  expectedStatus: number,
+  opts?: { instanceId?: string; instanceSecret?: string; apiBaseUrl?: string }
+): Promise<{ message: string; regression?: unknown }> {
+  const effectiveBase = opts?.apiBaseUrl ? opts.apiBaseUrl : "http://localhost:4000";
+  const url = apiUrl(`/traces/${encodeURIComponent(traceId)}/regression`, effectiveBase);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: headers(opts?.instanceId, opts?.instanceSecret),
+    body: JSON.stringify({ name, expected_status: expectedStatus }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let message = text;
+    try {
+      const parsed = JSON.parse(text) as { message?: string };
+      if (parsed.message) message = parsed.message;
+    } catch {
+      // keep raw
+    }
+    throw new Error(message || `HTTP ${res.status}: ${res.statusText}`);
+  }
+  return res.json() as Promise<{ message: string; regression?: unknown }>;
+}
+
+export async function getRegressions(
+  traceId: string,
+  opts?: { instanceId?: string; instanceSecret?: string; apiBaseUrl?: string }
+): Promise<RegressionsResponse> {
+  const effectiveBase = opts?.apiBaseUrl ? opts.apiBaseUrl : "http://localhost:4000";
+  const url = apiUrl(`/traces/${encodeURIComponent(traceId)}/regression`, effectiveBase);
+  const res = await fetch(url, {
+    headers: headers(opts?.instanceId, opts?.instanceSecret),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let message = text;
+    try {
+      const parsed = JSON.parse(text) as { message?: string };
+      if (parsed.message) message = parsed.message;
+    } catch {
+      // keep raw
+    }
+    throw new Error(message || `HTTP ${res.status}: ${res.statusText}`);
+  }
+  return res.json() as Promise<RegressionsResponse>;
+}
+
+export async function runRegression(
+  traceId: string,
+  regressionId: string | number,
+  targetBaseUrl: string,
+  opts?: { instanceId?: string; instanceSecret?: string; apiBaseUrl?: string }
+): Promise<RegressionRunResult> {
+  const effectiveBase = opts?.apiBaseUrl ? opts.apiBaseUrl : "http://localhost:4000";
+  const url = apiUrl(`/traces/${encodeURIComponent(traceId)}/regression/${encodeURIComponent(String(regressionId))}/run`, effectiveBase);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: headers(opts?.instanceId, opts?.instanceSecret),
+    body: JSON.stringify({ target_base_url: targetBaseUrl }),
+  });
+  const text = await res.text();
+  let data: RegressionRunResult | null = null;
+  try {
+    data = JSON.parse(text) as RegressionRunResult;
+  } catch {
+    // not json
+  }
+  if (res.ok || res.status === 404) {
+    // 404 is used by collector to signal FAIL but still returns expected/actual
+    if (data && typeof data.expected_status !== "undefined" && typeof data.actual_status !== "undefined") {
+      return data;
+    }
+  }
+  if (!res.ok) {
+    let message = text;
+    if (data && (data as { message?: string }).message) message = (data as { message?: string }).message!;
+    throw new Error(message || `HTTP ${res.status}: ${res.statusText}`);
+  }
+  if (!data) throw new Error(text || `HTTP ${res.status}`);
+  return data;
 }
 
 // For ConfigContext fallback — fetch instance_id
