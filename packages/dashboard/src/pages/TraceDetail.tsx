@@ -348,7 +348,7 @@ export function TraceDetail() {
                 <input
                   value={targetBaseUrl}
                   onChange={(e) => setTargetBaseUrl(e.target.value)}
-                  placeholder="http://localhost:5000"
+                  placeholder="http://localhost:6001"
                   className="w-full px-3 font-mono text-[13px]"
                   style={{
                     background: "var(--bg-surface)",
@@ -613,7 +613,7 @@ export function TraceDetail() {
                                 [r.id]: { ...(prev[r.id] ?? { show: true, targetUrl: "", loading: false, error: null, result: null }), targetUrl: e.target.value },
                               }))
                             }
-                            placeholder="http://localhost:5000"
+                            placeholder="http://localhost:6001"
                             className="w-full px-3 font-mono text-[13px]"
                             style={{
                               background: "var(--bg-surface)",

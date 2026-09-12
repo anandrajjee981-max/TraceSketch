@@ -3,13 +3,15 @@ import { getAllReplays, getReplaysByTraceId, insertReplayRun } from "../dao/repl
 import { Request, Response } from "express";
 
 export async function replayTrace(req: Request, res: Response) {
+  const targetBaseUrl = typeof req.body?.target_base_url === "string"
+    ? req.body.target_base_url.trim()
+    : "";
+
   try {
     const traceId = Array.isArray(req.params.traceId)
       ? req.params.traceId[0]
       : req.params.traceId;
-    const { target_base_url } = req.body;
-
-    if (!target_base_url) {
+    if (!targetBaseUrl) {
       return res.status(400).json({ message: "target_base_url is required" });
     }
 
@@ -19,12 +21,20 @@ export async function replayTrace(req: Request, res: Response) {
       return res.status(404).json({ message: "trace not found" });
     }
 
-    const { method, path, request_body, request_headers,trace_id } = trace as any;
+    const { method, path, request_body, request_headers, trace_id } = trace as any;
 
     const parsedHeaders = request_headers ? JSON.parse(request_headers) : {};
     const parsedBody = request_body ? JSON.parse(request_body) : {};
 
-    const fullUrl = target_base_url + path;
+    const fullUrl = targetBaseUrl + path;
+    try {
+      const parsedUrl = new URL(fullUrl);
+      if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+        return res.status(400).json({ message: "target_base_url must use http or https" });
+      }
+    } catch {
+      return res.status(400).json({ message: `Invalid target URL: ${fullUrl}` });
+    }
 
     const startTime = Date.now();
 
@@ -39,7 +49,7 @@ export async function replayTrace(req: Request, res: Response) {
 
     const saved = insertReplayRun(
       trace_id,
-      target_base_url,
+      targetBaseUrl,
       responseStatus,
       durationMs,
       "completed",
@@ -67,9 +77,18 @@ export async function replayTrace(req: Request, res: Response) {
     // Try to persist failed attempt if we can identify the trace
     try {
       const tid = (req.params.traceId as string) ?? "unknown";
-      insertReplayRun(tid, (req.body as { target_base_url?: string })?.target_base_url ?? "", 0, 0, "failed", Date.now());
+      insertReplayRun(tid, targetBaseUrl, 0, 0, "failed", Date.now());
     } catch {
       // ignore
+    }
+    const cause = err instanceof Error && "cause" in err
+      ? (err as Error & { cause?: { code?: string; message?: string } }).cause
+      : undefined;
+    if (cause?.message === "bad port") {
+      return res.status(400).json({ message: "Invalid target URL port. Use a valid HTTP port; the test app uses http://localhost:6001." });
+    }
+    if (cause?.code === "ECONNREFUSED") {
+      return res.status(502).json({ message: `Could not connect to ${targetBaseUrl}. Make sure the target server is running.` });
     }
     res.status(500).json({ message: "internal server error" });
   }

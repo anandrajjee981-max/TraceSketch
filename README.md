@@ -162,12 +162,22 @@ to run the collector
 cd packages/collector
 npm run dev
 
+
 to check instance file cretaed or not 
 cat ~/.tracesketch/config/instance.json
 
 to get instance secret 
 type "%USERPROFILE%\.tracesketch\config\instance.json"
 
+to start test server 
+npx tsx packages/sdk/test.app.ts
 
 
+npx tsx packages/sdk/test.app.ts
+start http://localhost:6001/auth
+curl http://localhost:6001/auth
+
+npm run dev:collector
+npx tsx packages/sdk/test.app.ts
+curl.exe http://localhost:6001/auth
 

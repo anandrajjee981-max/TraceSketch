@@ -65,7 +65,7 @@ export function ReplaySection({
             <input
               value={targetUrl}
               onChange={(e) => setTargetUrl(e.target.value)}
-              placeholder="http://localhost:5000"
+              placeholder="http://localhost:6001"
               className="w-full px-3 font-mono text-[13px]"
               style={{
                 background: "var(--bg-surface)",

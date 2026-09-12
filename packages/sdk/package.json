@@ -1,15 +1,25 @@
 {
   "name": "@tracesketch/sdk",
-  "private": true,
   "version": "0.0.1",
+  "description": "Local-first API tracing, replay, and regression testing SDK",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": ["dist"],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch"
   },
+  "keywords": ["tracing", "debugging", "replay", "regression-testing"],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
-    "typescript": "^5.7.0",
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "@types/express": "^5.0.0",
+    "typescript": "^5.7.0"
+  },
+  "peerDependencies": {
+    "express": "^4.0.0 || ^5.0.0"
   }
 }
