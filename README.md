@@ -181,3 +181,4 @@ npm run dev:collector
 npx tsx packages/sdk/test.app.ts
 curl.exe http://localhost:6001/auth
 
+   npm link @tracesketch/sdk

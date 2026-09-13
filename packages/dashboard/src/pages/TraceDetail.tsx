@@ -132,8 +132,8 @@ export function TraceDetail() {
       setRegError("Test Name is required");
       return;
     }
-    if (!Number.isFinite(regExpected)) {
-      setRegError("Expected Status Code is required");
+    if (!Number.isFinite(regExpected) || regExpected < 100 || regExpected > 599) {
+      setRegError("Expected Status Code must be 100-599");
       return;
     }
     setRegSaving(true);
@@ -144,8 +144,8 @@ export function TraceDetail() {
       setShowRegressionForm(false);
       setRegName("");
       setRegExpected(200);
-      // refresh list
-      fetchRegressions();
+      // refresh list — await so UI updates before hiding
+      await fetchRegressions();
       setTimeout(() => setRegSavedMsg(null), 3000);
     } catch (err) {
       setRegError(err instanceof Error ? err.message : String(err));
@@ -172,7 +172,7 @@ export function TraceDetail() {
     }));
     try {
       const res = await runRegression(trace.trace_id, regressionId, trimmed, { instanceId, apiBaseUrl });
-      const passed = res.expected_status === res.actual_status;
+      const passed = typeof res.passed === "boolean" ? res.passed : res.expected_status === res.actual_status;
       setRunForms((prev) => ({
         ...prev,
         [regressionId]: { ...(prev[regressionId] ?? { show: true, targetUrl: trimmed, loading: false, error: null, result: null }), loading: false, result: { expected_status: res.expected_status, actual_status: res.actual_status, passed }, error: null },

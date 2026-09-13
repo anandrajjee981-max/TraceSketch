@@ -59,7 +59,7 @@ export async function replayTrace(
   targetBaseUrl: string,
   opts?: { instanceId?: string; instanceSecret?: string; apiBaseUrl?: string }
 ): Promise<ReplayResult> {
-  const effectiveBase = opts?.apiBaseUrl ? opts.apiBaseUrl : "http://localhost:4000";
+  const effectiveBase = opts?.apiBaseUrl !== undefined ? opts.apiBaseUrl : getApiBase();
   const url = apiUrl(`/traces/${encodeURIComponent(traceId)}/replay`, effectiveBase);
   const res = await fetch(url, {
     method: "POST",
@@ -99,7 +99,7 @@ export async function createRegression(
   expectedStatus: number,
   opts?: { instanceId?: string; instanceSecret?: string; apiBaseUrl?: string }
 ): Promise<{ message: string; regression?: unknown }> {
-  const effectiveBase = opts?.apiBaseUrl ? opts.apiBaseUrl : "http://localhost:4000";
+  const effectiveBase = opts?.apiBaseUrl !== undefined ? opts.apiBaseUrl : getApiBase();
   const url = apiUrl(`/traces/${encodeURIComponent(traceId)}/regression`, effectiveBase);
   const res = await fetch(url, {
     method: "POST",
@@ -124,7 +124,7 @@ export async function getRegressions(
   traceId: string,
   opts?: { instanceId?: string; instanceSecret?: string; apiBaseUrl?: string }
 ): Promise<RegressionsResponse> {
-  const effectiveBase = opts?.apiBaseUrl ? opts.apiBaseUrl : "http://localhost:4000";
+  const effectiveBase = opts?.apiBaseUrl !== undefined ? opts.apiBaseUrl : getApiBase();
   const url = apiUrl(`/traces/${encodeURIComponent(traceId)}/regression`, effectiveBase);
   const res = await fetch(url, {
     headers: headers(opts?.instanceId, opts?.instanceSecret),
@@ -149,7 +149,7 @@ export async function runRegression(
   targetBaseUrl: string,
   opts?: { instanceId?: string; instanceSecret?: string; apiBaseUrl?: string }
 ): Promise<RegressionRunResult> {
-  const effectiveBase = opts?.apiBaseUrl ? opts.apiBaseUrl : "http://localhost:4000";
+  const effectiveBase = opts?.apiBaseUrl !== undefined ? opts.apiBaseUrl : getApiBase();
   const url = apiUrl(`/traces/${encodeURIComponent(traceId)}/regression/${encodeURIComponent(String(regressionId))}/run`, effectiveBase);
   const res = await fetch(url, {
     method: "POST",
@@ -163,11 +163,9 @@ export async function runRegression(
   } catch {
     // not json
   }
-  if (res.ok || res.status === 404) {
-    // 404 is used by collector to signal FAIL but still returns expected/actual
-    if (data && typeof data.expected_status !== "undefined" && typeof data.actual_status !== "undefined") {
-      return data;
-    }
+  // Collector returns expected/actual for PASS(200), FAIL(legacy 404), and error stubs (408/502). Treat any with those fields as success.
+  if (data && typeof data.expected_status !== "undefined" && typeof data.actual_status !== "undefined") {
+    return data;
   }
   if (!res.ok) {
     let message = text;

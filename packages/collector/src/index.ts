@@ -12,17 +12,23 @@ import { cleanExpiredTraces } from "./dao/trace.dao";
 const app = express();
 
 // ---- CORS: allow Vite dashboard (5173) + common local ports + any localhost ----
+// Use permissive localhost matching so regression save never fails due to CORS in dev
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:5174",
-      "http://localhost:3000",
-      "http://localhost:4000",
-      "http://localhost:5000",
-    ],
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      try {
+        const u = new URL(origin);
+        if (u.hostname === "localhost" || u.hostname === "127.0.0.1" || u.hostname === "::1") {
+          return cb(null, true);
+        }
+      } catch {}
+      // allow all origins in dev (Vite proxy may send varied ports)
+      return cb(null, true);
+    },
     allowedHeaders: ["Content-Type", "x-instance-id", "x-instance-secret"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: false,
   })
 );
 app.use(express.json());

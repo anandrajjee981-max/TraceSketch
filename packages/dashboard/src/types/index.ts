@@ -77,4 +77,5 @@ export interface RegressionRunResult {
   message: string;
   expected_status: number;
   actual_status: number;
+  passed?: boolean;
 }

@@ -21,12 +21,32 @@ export async function replayTrace(req: Request, res: Response) {
       return res.status(404).json({ message: "trace not found" });
     }
 
-    const { method, path, request_body, request_headers, trace_id } = trace as any;
+    const { method, path, request_body, request_headers, query_params, trace_id } = trace as any;
 
-    const parsedHeaders = request_headers ? JSON.parse(request_headers) : {};
-    const parsedBody = request_body ? JSON.parse(request_body) : {};
+    const rawHeaders = request_headers ? JSON.parse(request_headers) : {};
+    const parsedBody = request_body ? JSON.parse(request_body) : null;
 
-    const fullUrl = targetBaseUrl + path;
+    // strip hop-by-hop / host headers that cause 408/timeout on target
+    const hopByHop = new Set(["host","connection","keep-alive","proxy-connection","transfer-encoding","content-length","te","trailer","upgrade","x-instance-id","x-instance-secret"]);
+    const headers: Record<string,string> = {};
+    for (const [k,v] of Object.entries(rawHeaders as Record<string, unknown>)) {
+      if (hopByHop.has(k.toLowerCase())) continue;
+      if (v == null) continue;
+      headers[k] = Array.isArray(v) ? v.join(", ") : String(v);
+    }
+    if (!headers["content-type"] && !headers["Content-Type"]) headers["content-type"] = "application/json";
+
+    // build full URL with query params if present
+    let fullUrl = targetBaseUrl.replace(/\/$/, "") + path;
+    if (query_params) {
+      try {
+        const qp = JSON.parse(query_params);
+        if (qp && typeof qp === "object" && Object.keys(qp).length > 0) {
+          const qs = new URLSearchParams(qp as Record<string,string>).toString();
+          fullUrl += (fullUrl.includes("?") ? "&" : "?") + qs;
+        }
+      } catch {}
+    }
     try {
       const parsedUrl = new URL(fullUrl);
       if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
@@ -36,13 +56,31 @@ export async function replayTrace(req: Request, res: Response) {
       return res.status(400).json({ message: `Invalid target URL: ${fullUrl}` });
     }
 
+    const hasBody = method !== 'GET' && method !== 'HEAD' && parsedBody != null && !(typeof parsedBody === 'object' && Object.keys(parsedBody).length === 0);
+    const body = hasBody ? JSON.stringify(parsedBody) : undefined;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
     const startTime = Date.now();
 
-    const response = await fetch(fullUrl, {
-      method: method,
-      headers: parsedHeaders,
-      body: method !== 'GET' ? JSON.stringify(parsedBody) : undefined
-    });
+    let response: globalThis.Response;
+    try {
+      response = await fetch(fullUrl, {
+        method: method,
+        headers,
+        body,
+        signal: controller.signal,
+      } as RequestInit);
+    } catch (fetchErr) {
+      clearTimeout(timeout);
+      if ((fetchErr as Error).name === "AbortError") {
+        try { insertReplayRun(trace_id, targetBaseUrl, 408, Date.now() - startTime, "timeout", Date.now()); } catch {}
+        return res.status(408).json({ message: `Request to ${fullUrl} timed out after 7s. Is the target server running?` });
+      }
+      throw fetchErr;
+    } finally {
+      clearTimeout(timeout);
+    }
 
     const durationMs = Date.now() - startTime;
     const responseStatus = response.status;
@@ -88,7 +126,10 @@ export async function replayTrace(req: Request, res: Response) {
       return res.status(400).json({ message: "Invalid target URL port. Use a valid HTTP port; the test app uses http://localhost:6001." });
     }
     if (cause?.code === "ECONNREFUSED") {
-      return res.status(502).json({ message: `Could not connect to ${targetBaseUrl}. Make sure the target server is running.` });
+      return res.status(502).json({ message: `Could not connect to ${targetBaseUrl}. Make sure the target server is running (test app default is http://localhost:6001).` });
+    }
+    if ((err as Error).name === "AbortError") {
+      return res.status(408).json({ message: `Request to ${targetBaseUrl} timed out after 7s.` });
     }
     res.status(500).json({ message: "internal server error" });
   }

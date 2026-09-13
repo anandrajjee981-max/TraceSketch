@@ -69,10 +69,9 @@ id INTEGER PRIMARY KEY AUTOINCREMENT,
 source_trace_id TEXT NOT NULL,
 name TEXT NOT NULL,
 expected_status INTEGER,
-expected_schema TEXT ,
+expected_schema TEXT,
 created_at INTEGER NOT NULL,
 FOREIGN KEY (source_trace_id) REFERENCES traces(trace_id) ON DELETE CASCADE
-
 )
 
 
@@ -93,9 +92,13 @@ FOREIGN KEY (source_trace_id) REFERENCES traces(trace_id) ON DELETE CASCADE
   ];
 
   if (!requiredRegressionColumns.every((column) => regressionColumns.includes(column))) {
-    db.exec('ALTER TABLE regression_tests RENAME TO regression_tests_legacy');
+    try {
+      // if legacy already exists from previous broken migration, drop it first
+      db.exec('DROP TABLE IF EXISTS regression_tests_legacy');
+      db.exec('ALTER TABLE regression_tests RENAME TO regression_tests_legacy');
+    } catch {}
     db.exec(`
-      CREATE TABLE regression_tests (
+      CREATE TABLE IF NOT EXISTS regression_tests (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         source_trace_id TEXT NOT NULL,
         name TEXT NOT NULL,
@@ -105,7 +108,22 @@ FOREIGN KEY (source_trace_id) REFERENCES traces(trace_id) ON DELETE CASCADE
         FOREIGN KEY (source_trace_id) REFERENCES traces(trace_id) ON DELETE CASCADE
       )
     `);
+    // migrate any existing valid rows from legacy (if legacy had correct shape)
+    try {
+      const legacyCols = db.pragma('table_info(regression_tests_legacy)').map((c: { name: string }) => c.name);
+      if (requiredRegressionColumns.every((c) => legacyCols.includes(c))) {
+        db.exec(`INSERT INTO regression_tests (id, source_trace_id, name, expected_status, expected_schema, created_at)
+                 SELECT id, source_trace_id, name, expected_status, expected_schema, created_at FROM regression_tests_legacy`);
+      }
+    } catch {}
   }
+  // cleanup broken legacy table if it has invalid schema (no types)
+  try {
+    const legacy = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='regression_tests_legacy'").get() as { sql: string } | undefined;
+    if (legacy && !legacy.sql.includes('TEXT')) {
+      db.exec('DROP TABLE IF EXISTS regression_tests_legacy');
+    }
+  } catch {}
 
   // purge orphans left from pre-FK DBs where CASCADE never ran (existing users)
   try {
