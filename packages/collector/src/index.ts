@@ -8,6 +8,7 @@ import eventsRouter from "./routes/events.routes";
 import regressionrouter from "./routes/regression.route";
 import cron from 'node-cron';
 import { cleanExpiredTraces } from "./dao/trace.dao";
+import path from 'path';
 
 const app = express();
 
@@ -58,6 +59,18 @@ cron.schedule('0 */2 * * *', () => {
   const count = cleanExpiredTraces();
   console.log(`Cleanup finished: Removed ${count} expired records.`);
 });
+
+app.use(express.static(path.join(__dirname, '../../dashboard/dist')));
+
+// Client-side routing support (React Router jaisa kuch use ho raha ho toh)
+app.get('/{*splat}', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../../dashboard/dist/index.html'));
+});
+
+app.listen(8470, () => {
+  console.log('Dashboard available at http://localhost:8470');
+});
+
 app.listen(PORT, () => {
   console.log(`Collector listening on http://localhost:${PORT}`);
 });

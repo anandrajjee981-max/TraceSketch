@@ -1,0 +1,35 @@
+{
+  "name": "tracesketch",
+  "version": "0.0.1",
+  "description": "Local-first API tracing, replay, and regression testing",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "tracesketch": "dist/cli.js"
+  },
+  "files": ["dist", "dashboard-dist"],
+  "scripts": {
+    "build": "tsc"
+  },
+  "peerDependencies": {
+    "express": "^4.0.0 || ^5.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.20.0",
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.6",
+    "express": "^5.1.0",
+    "node-cron": "^4.6.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/node-cron": "^3.0.11",
+    "typescript": "^5.7.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

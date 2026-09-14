@@ -1,71 +1,103 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
-/* ─── Design Tokens ────────────────────────────────────────────────────── */
+/* ─── Design Tokens Inspired by logo.png ────────────────────────────────── */
+/*
+  Color story from the TS mark:
+    "T" = dark charcoal  → bg-surface, bg-page tones  (#0A0D14 … #1D2235)
+    "S" = vivid violet   → accent (#6C47FF)
+    Geometry: parallelograms, angular skews, bold geometric overlaps
+*/
+
+/* ─── Design Tokens Inspired by logo.png ────────────────────────────────── */
 :root {
-  --bg-page:      #FAF8F5;
-  --bg-surface:   #FFFCF9;
-  --bg-surface-2: #F0EDE8;
-  --bg-surface-3: #E8E2DA;
+  --bg-page:        #0A0D14;
+  --bg-surface:     #111420;
+  --bg-surface-2:   #161B2B;
+  --bg-surface-3:   #1E253A;
 
-  --border:       #DDD5C8;
-  --border-dim:   #E8E2DA;
+  --border:         #262E44;
+  --border-dim:     #1A2030;
+  --border-accent:  rgba(108, 71, 255, 0.35);
 
-  --accent:       #C4874A;
-  --accent-light: #F5E8D8;
-  --accent-hover: #A8703A;
-  --accent-text:  #7A4F28;
+  --accent:         #6C47FF;
+  --accent-light:   rgba(108, 71, 255, 0.15);
+  --accent-hover:   #7E5BFF;
+  --accent-text:    #A78BFA;
+  --accent-glow:    rgba(108, 71, 255, 0.45);
 
-  --text-primary:   #2C1810;
-  --text-secondary: #6B4F3A;
-  --text-dim:       #9C8070;
+  --text-primary:   #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-dim:       #64748B;
 
-  /* Status — earthy, muted */
-  --green:    #4A8C5C;
-  --green-bg: #EAF3EC;
-  --green-border: #B8D9C2;
+  /* Status Accents (Cyberpunk High-Contrast) */
+  --green:          #10B981;
+  --green-bg:       rgba(16, 185, 129, 0.12);
+  --green-border:   rgba(16, 185, 129, 0.35);
 
-  --amber:    #A86820;
-  --amber-bg: #FDF1E0;
-  --amber-border: #E8C080;
+  --blue:           #38BDF8;
+  --blue-bg:        rgba(56, 189, 248, 0.12);
+  --blue-border:    rgba(56, 189, 248, 0.35);
 
-  --red:      #B84A35;
-  --red-bg:   #FAECEA;
-  --red-border: #E0A898;
+  --amber:          #F59E0B;
+  --amber-bg:       rgba(245, 158, 11, 0.12);
+  --amber-border:   rgba(245, 158, 11, 0.35);
 
-  --blue:     #3A6E9C;
-  --blue-bg:  #EAF2F8;
-  --blue-border: #A8C8E0;
+  --red:            #F43F5E;
+  --red-bg:         rgba(244, 63, 94, 0.12);
+  --red-border:     rgba(244, 63, 94, 0.35);
 
-  --shadow-sm:   0 1px 3px rgba(44,24,16,0.08);
-  --shadow-md:   0 2px 8px rgba(44,24,16,0.10);
-  --shadow-card: 0 1px 3px rgba(44,24,16,0.06), 0 0 0 1px rgba(44,24,16,0.04);
+  --shadow-sm:      0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-md:      0 4px 16px rgba(0, 0, 0, 0.6);
+  --shadow-card:    0 2px 10px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-glow:    0 0 25px -4px rgba(108, 71, 255, 0.35);
 }
 
 /* ─── Reset & Base ─────────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; }
-html, body, #root { height: 100%; }
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  color-scheme: dark;
+}
 
 body {
   margin: 0;
-  font-family: "Inter", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: var(--bg-page);
-  color: var(--text-primary);
   font-size: 13px;
   line-height: 1.5;
+  overflow-x: hidden;
 }
 
-/* ─── Scrollbar ────────────────────────────────────────────────────────── */
+/* ─── Scrollbars ───────────────────────────────────────────────────────── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: rgba(108, 71, 255, 0.3) transparent;
 }
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--bg-surface-3); }
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(108, 71, 255, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(108, 71, 255, 0.5);
+}
 
 /* ─── Animations ───────────────────────────────────────────────────────── */
 @keyframes shimmer {
@@ -74,25 +106,73 @@ body {
 }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes statIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-/* ─── Utilities ────────────────────────────────────────────────────────── */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(108, 71, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(108, 71, 255, 0.5);
+  }
+}
+
+@keyframes radarPing {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* ─── Custom Classes ──────────────────────────────────────────────────── */
 .fade-up {
-  animation: fadeUp 0.25s ease both;
+  animation: fadeUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .stat-in {
-  animation: statIn 0.3s cubic-bezier(0.16,1,0.3,1) both;
+  animation: statIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Skeleton shimmer — warm tone */
+.animate-float {
+  animation: floatSlow 4s ease-in-out infinite;
+}
+
 .skeleton-shimmer {
   background: linear-gradient(
     90deg,
@@ -101,14 +181,256 @@ body {
     var(--bg-surface-2) 100%
   );
   background-size: 600px 100%;
-  animation: shimmer 1.4s infinite linear;
+  animation: shimmer 1.5s infinite linear;
+}
+
+.glow-violet {
+  box-shadow: 0 0 25px -4px rgba(108, 71, 255, 0.45);
+}
+
+.glow-violet-sm {
+  box-shadow: 0 0 12px -2px rgba(108, 71, 255, 0.35);
+}
+
+.border-glow-hover {
+  transition: all 0.2s ease;
+}
+.border-glow-hover:hover {
+  border-color: rgba(108, 71, 255, 0.5);
+  box-shadow: 0 0 20px -3px rgba(108, 71, 255, 0.25);
+}
+
+.glass-panel {
+  background: rgba(17, 20, 32, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gradient-text-hero {
+  background: linear-gradient(135deg, #FFFFFF 20%, #C4B5FD 60%, #818CF8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-text-accent {
+  background: linear-gradient(135deg, #A78BFA 0%, #6C47FF 60%, #4F2BE3 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Background Cyber Grid */
+.bg-grid-cyber {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 }
 
 /* Select styling override */
 select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' stroke='%239C8070' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' stroke='%2394A3B8' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 8px center;
-  padding-right: 24px !important;
+  background-position: right 10px center;
+  padding-right: 28px !important;
 }
+
+/* ─── TS Logo-Inspired Geometric Design System ──────────────────────────── */
+/*
+  Inspired by the TraceSketch "TS" logomark:
+    - Angular parallelogram shapes (like the T's skewed top bar)
+    - Interlocking/overlapping elements (like T & S overlap)
+    - Sharp geometric clip-paths
+    - Bold charcoal (#1D2235) + vivid violet (#6C47FF) contrast
+*/
+
+/* Angular skewed accent bar — mirrors the T's parallelogram top */
+.ts-bar {
+  position: relative;
+  overflow: hidden;
+}
+.ts-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, var(--accent) 0%, transparent 60%);
+  opacity: 0.08;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Parallelogram badge — skewed like T's top bar */
+.badge-angular {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px 2px 8px;
+  clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.badge-angular-accent {
+  background: rgba(108, 71, 255, 0.2);
+  color: #A78BFA;
+  border: none;
+}
+
+.badge-angular-green {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10B981;
+}
+
+.badge-angular-red {
+  background: rgba(244, 63, 94, 0.15);
+  color: #F43F5E;
+}
+
+.badge-angular-amber {
+  background: rgba(245, 158, 11, 0.15);
+  color: #F59E0B;
+}
+
+/* Geometric card with angled top-right corner (like S-curve cut) */
+.card-geometric {
+  position: relative;
+  border-radius: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+.card-geometric::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent) 0%, #9B6DFF 50%, transparent 100%);
+  border-radius: 10px 10px 0 0;
+}
+
+/* Animated accent scan-line — like tracing a path */
+@keyframes scanLine {
+  0% { transform: translateX(-100%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(200%); opacity: 0; }
+}
+
+.card-geometric:hover::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -50%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(108, 71, 255, 0.04) 50%,
+    transparent 100%
+  );
+  animation: scanLine 1.5s ease-in-out;
+  pointer-events: none;
+}
+
+/* Sidebar logo accent — sharp left border like T stem */
+.ts-nav-active {
+  position: relative;
+}
+.ts-nav-active::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 15%;
+  bottom: 15%;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(108, 71, 255, 0.6);
+}
+
+/* Skewed section divider — parallelogram like T's top bar */
+.ts-divider {
+  position: relative;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 20%,
+    rgba(108, 71, 255, 0.4) 80%,
+    transparent 100%
+  );
+  margin: 0;
+  transform: skewX(-8deg);
+}
+
+/* Angular accent corner decoration — top-right geometric cut */
+.corner-cut-tr {
+  position: relative;
+  overflow: hidden;
+}
+.corner-cut-tr::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  background: var(--bg-page);
+  clip-path: polygon(100% 0, 0 0, 100% 100%);
+}
+
+/* TS mark watermark for empty states */
+.ts-watermark {
+  opacity: 0.04;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Stat card accent pulse on hover */
+.stat-card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card-hover:hover {
+  transform: translateY(-2px);
+}
+
+/* Bold geometric heading underline using accent */
+.heading-geo {
+  position: relative;
+  display: inline-block;
+}
+.heading-geo::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 100%, 8px 100%);
+}
+
+/* Logo-mark size token for the sidebar TS badge */
+.ts-icon-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #121624;
+  border: 1px solid rgba(108, 71, 255, 0.45);
+  box-shadow: 0 0 14px rgba(108, 71, 255, 0.3), inset 0 1px 0 rgba(255,255,255,0.05);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  overflow: hidden;
+}
+.ts-icon-badge:hover {
+  box-shadow: 0 0 20px rgba(108, 71, 255, 0.5);
+  border-color: rgba(108, 71, 255, 0.7);
+}
+

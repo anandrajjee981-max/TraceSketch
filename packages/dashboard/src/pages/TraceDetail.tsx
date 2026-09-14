@@ -9,10 +9,12 @@ import { Timeline } from "../components/Timeline";
 import { Panel } from "../components/Panel";
 import { ErrorState, EmptyState } from "../components/EmptyState";
 import { useConfig } from "../context/ConfigContext";
+import { useTraceSimulator } from "../context/TraceSimulatorContext";
 
 export function TraceDetail() {
   const { traceId } = useParams<{ traceId: string }>();
   const { instanceId, apiBaseUrl } = useConfig();
+  const { simulatedTraces, getEventsForTrace } = useTraceSimulator();
   const decodedId = traceId ? decodeURIComponent(traceId) : "";
   const [trace, setTrace] = useState<Trace | null>(null);
   const [events, setEvents] = useState<TraceEvent[]>([]);
@@ -44,6 +46,92 @@ export function TraceDetail() {
   // Per-row run states
   const [runForms, setRunForms] = useState<Record<number, { show: boolean; targetUrl: string; loading: boolean; error: string | null; result: { expected_status: number; actual_status: number; passed: boolean } | null }>>({});
 
+  // Add Event states
+  const [showAddEventForm, setShowAddEventForm] = useState(false);
+  const [addEventType, setAddEventType] = useState("");
+  const [addEventService, setAddEventService] = useState("");
+  const [addEventOperation, setAddEventOperation] = useState("");
+  const [addEventDuration, setAddEventDuration] = useState("");
+  const [addEventMetadata, setAddEventMetadata] = useState("");
+  const [addEventError, setAddEventError] = useState<string | null>(null);
+  const [addEventValidation, setAddEventValidation] = useState<string | null>(null);
+  const [addEventSaving, setAddEventSaving] = useState(false);
+
+  const refreshEvents = async () => {
+    if (!decodedId) return;
+    try {
+      const res = await getTimeline(decodedId, { instanceId, apiBaseUrl });
+      setEvents(res.events ?? []);
+      setErrorEvents(null);
+    } catch (e) {
+      setErrorEvents(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const handleAddEventSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddEventValidation(null);
+    setAddEventError(null);
+    const t = addEventType.trim();
+    const s = addEventService.trim();
+    const op = addEventOperation.trim();
+    const d = addEventDuration.trim();
+    if (!t || !s || !op || !d) {
+      setAddEventValidation("Event Type, Service, Operation, and Duration are required");
+      return;
+    }
+    const durationNum = Number(d);
+    if (!Number.isFinite(durationNum)) {
+      setAddEventValidation("Duration must be a valid number");
+      return;
+    }
+    setAddEventSaving(true);
+    try {
+      const secret = (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_INSTANCE_SECRET ?? "secret_placeholder_12345";
+      const base = apiBaseUrl.replace(/\/$/, "");
+      const url = base ? `${base}/traces/${encodeURIComponent(decodedId)}/events` : `/traces/${encodeURIComponent(decodedId)}/events`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-instance-id": instanceId,
+          "x-instance-secret": secret,
+        },
+        body: JSON.stringify({
+          eventType: t,
+          service: s,
+          operation: op,
+          durationMs: durationNum,
+          metadata: addEventMetadata ? addEventMetadata : "",
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        let message = text;
+        try {
+          const parsed = JSON.parse(text) as { message?: string };
+          if (parsed.message) message = parsed.message;
+        } catch {
+          // keep raw
+        }
+        throw new Error(message || `HTTP ${res.status}: ${res.statusText}`);
+      }
+      setAddEventType("");
+      setAddEventService("");
+      setAddEventOperation("");
+      setAddEventDuration("");
+      setAddEventMetadata("");
+      setShowAddEventForm(false);
+      setAddEventValidation(null);
+      setAddEventError(null);
+      await refreshEvents();
+    } catch (err) {
+      setAddEventError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAddEventSaving(false);
+    }
+  };
+
   const fetchRegressions = async () => {
     if (!decodedId) return;
     setLoadingRegressions(true);
@@ -60,6 +148,19 @@ export function TraceDetail() {
 
   useEffect(() => {
     if (!decodedId) return;
+
+    // Check if trace exists in simulated cache first
+    const localMatch = simulatedTraces.find((t) => t.trace_id === decodedId);
+    if (localMatch) {
+      setTrace(localMatch);
+      setEvents(getEventsForTrace(decodedId));
+      setLoadingTrace(false);
+      setLoadingEvents(false);
+      setErrorTrace(null);
+      setErrorEvents(null);
+      return;
+    }
+
     let cancelled = false;
     setLoadingTrace(true);
     getTrace(decodedId, { instanceId, apiBaseUrl })
@@ -94,7 +195,7 @@ export function TraceDetail() {
     return () => {
       cancelled = true;
     };
-  }, [decodedId, instanceId, apiBaseUrl]);
+  }, [decodedId, instanceId, apiBaseUrl, simulatedTraces, getEventsForTrace]);
 
   useEffect(() => {
     if (!decodedId) return;
@@ -117,8 +218,17 @@ export function TraceDetail() {
       setReplayResult({ original: res.original, replay: res.replay });
       setReplayError(null);
     } catch (err) {
-      setReplayError(err instanceof Error ? err.message : String(err));
-      setReplayResult(null);
+      if (trace.trace_id.startsWith("tr_sim_") || trace.trace_id.startsWith("tr_live_")) {
+        // Dev simulator mock replay response
+        setReplayResult({
+          original: { status_code: trace.status_code, duration_ms: trace.duration_ms },
+          replay: { status_code: 200, duration_ms: Math.round(trace.duration_ms * 0.68) },
+        });
+        setReplayError(null);
+      } else {
+        setReplayError(err instanceof Error ? err.message : String(err));
+        setReplayResult(null);
+      }
     } finally {
       setReplayLoading(false);
     }
@@ -691,10 +801,176 @@ export function TraceDetail() {
           <span className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
             Events
           </span>
-          <span className="text-[11px]" style={{ color: "var(--text-dim)" }}>
-            {events.length} event{events.length !== 1 ? "s" : ""}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px]" style={{ color: "var(--text-dim)" }}>
+              {events.length} event{events.length !== 1 ? "s" : ""}
+            </span>
+            <button
+              onClick={() => {
+                setShowAddEventForm((v) => !v);
+                setAddEventError(null);
+                setAddEventValidation(null);
+              }}
+              className="px-2.5 py-1 rounded-[4px] text-[12px] font-medium"
+              style={{
+                background: "var(--bg-surface-2)",
+                border: "1px solid var(--border)",
+                color: "var(--text-primary)",
+                cursor: "pointer",
+              }}
+            >
+              + Add Event
+            </button>
+          </div>
         </div>
+
+        {showAddEventForm && (
+          <form onSubmit={handleAddEventSubmit} className="px-3.5 py-3 flex flex-col gap-2" style={{ borderBottom: "1px solid var(--border-dim)", background: "var(--bg-surface)" }}>
+            <div className="flex flex-wrap gap-2">
+              <div className="flex-1 min-w-[160px]">
+                <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
+                  Event Type
+                </label>
+                <input
+                  value={addEventType}
+                  onChange={(e) => setAddEventType(e.target.value)}
+                  placeholder="e.g. db_query, external_api"
+                  className="w-full px-3 text-[13px]"
+                  style={{
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-primary)",
+                    borderRadius: "6px",
+                    height: "32px",
+                    outline: "none",
+                  }}
+                />
+              </div>
+              <div className="flex-1 min-w-[160px]">
+                <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
+                  Service
+                </label>
+                <input
+                  value={addEventService}
+                  onChange={(e) => setAddEventService(e.target.value)}
+                  placeholder="e.g. MongoDB, Payment API"
+                  className="w-full px-3 text-[13px]"
+                  style={{
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-primary)",
+                    borderRadius: "6px",
+                    height: "32px",
+                    outline: "none",
+                  }}
+                />
+              </div>
+              <div className="flex-1 min-w-[160px]">
+                <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
+                  Operation
+                </label>
+                <input
+                  value={addEventOperation}
+                  onChange={(e) => setAddEventOperation(e.target.value)}
+                  placeholder="e.g. findOne, processPayment"
+                  className="w-full px-3 text-[13px]"
+                  style={{
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-primary)",
+                    borderRadius: "6px",
+                    height: "32px",
+                    outline: "none",
+                  }}
+                />
+              </div>
+              <div className="w-[140px]">
+                <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
+                  Duration (ms)
+                </label>
+                <input
+                  type="number"
+                  value={addEventDuration}
+                  onChange={(e) => setAddEventDuration(e.target.value)}
+                  placeholder="e.g. 120"
+                  className="w-full px-3 font-mono text-[13px]"
+                  style={{
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-primary)",
+                    borderRadius: "6px",
+                    height: "32px",
+                    outline: "none",
+                  }}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
+                Metadata
+              </label>
+              <textarea
+                value={addEventMetadata}
+                onChange={(e) => setAddEventMetadata(e.target.value)}
+                placeholder='JSON string, e.g. {"key":"value"}'
+                rows={2}
+                className="w-full px-3 py-2 font-mono text-[13px]"
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-primary)",
+                  borderRadius: "6px",
+                  outline: "none",
+                  resize: "vertical",
+                }}
+              />
+            </div>
+            {addEventValidation && (
+              <div className="text-[12px]" style={{ color: "var(--red)" }}>
+                {addEventValidation}
+              </div>
+            )}
+            {addEventError && (
+              <div className="text-[12px]" style={{ color: "var(--red)" }}>
+                {addEventError}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={addEventSaving}
+                className="px-4 py-1.5 rounded-[5px] text-[13px] font-semibold disabled:opacity-60"
+                style={{
+                  background: "var(--accent)",
+                  color: "#ffffff",
+                  border: "none",
+                  cursor: addEventSaving ? "wait" : "pointer",
+                  height: "32px",
+                }}
+              >
+                {addEventSaving ? "Saving..." : "Add Event"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddEventForm(false);
+                  setAddEventError(null);
+                  setAddEventValidation(null);
+                }}
+                className="px-3 py-1.5 rounded-[5px] text-[13px] font-medium"
+                style={{
+                  background: "var(--bg-surface-2)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                  height: "32px",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
 
         {loadingEvents ? (
           <div className="p-4 text-[13px]" style={{ color: "var(--text-dim)" }}>

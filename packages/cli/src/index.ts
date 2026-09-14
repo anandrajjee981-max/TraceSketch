@@ -5,7 +5,9 @@
 //   sketch post /api/payment 5000                  → http://localhost:5000/api/payment
 //   sketch post /api/payment http://anan.com        → http://anan.com/api/payment
 //   sketch post /api/payment 5000 --body '{"a":1}'  → with JSON body
-
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 const args = process.argv.slice(2);
 
 if (args.length < 3) {
@@ -29,7 +31,12 @@ function resolveBaseUrl(target: string): string {
   // fallback: assume it's a hostname without protocol
   return `http://${target}`;
 }
-
+function getInstanceCredentials(): { instance_id: string; secret: string } | null {
+  const instanceFile = path.join(os.homedir(), '.tracesketch', 'config', 'instance.json');
+  if (!fs.existsSync(instanceFile)) return null;
+  const raw = fs.readFileSync(instanceFile, 'utf-8');
+  return JSON.parse(raw);
+}
 // Parse optional --body flag
 function getBodyArg(args: string[]): string | undefined {
   const idx = args.indexOf('--body');
@@ -47,6 +54,7 @@ async function run() {
   const startTime = Date.now();
 
   try {
+
     const response = await fetch(fullUrl, {
       method,
       headers: { 'Content-Type': 'application/json' },
