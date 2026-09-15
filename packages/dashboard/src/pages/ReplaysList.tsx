@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAllReplays, getAllRegressions } from "../api/client";
-import type { ReplayRun, RegressionTest } from "../types";
+import { getAllReplays } from "../api/client";
+import type { ReplayRun } from "../types";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Panel } from "../components/Panel";
 import { StatusBadge } from "../components/StatusBadge";
@@ -27,7 +27,6 @@ export function ReplaysList() {
   const navigate = useNavigate();
   const { instanceId, apiBaseUrl } = useConfig();
   const [replays, setReplays] = useState<ReplayRun[]>([]);
-  const [regressions, setRegressions] = useState<RegressionTest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,27 +34,17 @@ export function ReplaysList() {
     setLoading(true);
     setError(null);
     try {
-      const [replaysRes, regressionsRes] = await Promise.allSettled([
-        getAllReplays({ instanceId, apiBaseUrl, limit: 100 }),
-        getAllRegressions({ instanceId, apiBaseUrl, limit: 100 }),
-      ]);
+      const replaysRes = await getAllReplays({ instanceId, apiBaseUrl, limit: 100 });
 
       const fetchedReplays =
-        replaysRes.status === "fulfilled" && Array.isArray(replaysRes.value.replays)
-          ? replaysRes.value.replays
-          : [];
-
-      const fetchedRegressions =
-        regressionsRes.status === "fulfilled" && Array.isArray(regressionsRes.value.regressions)
-          ? regressionsRes.value.regressions
+        Array.isArray(replaysRes.replays)
+          ? replaysRes.replays
           : [];
 
       setReplays(fetchedReplays);
-      setRegressions(fetchedRegressions);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setReplays([]);
-      setRegressions([]);
     } finally {
       setLoading(false);
     }
@@ -235,83 +224,6 @@ export function ReplaysList() {
         )}
       </Panel>
 
-      {/* ── Regression Tests Table ─────────────────────────────────── */}
-      <div className="mt-6 mb-2 flex items-center gap-2">
-        <span
-          className="text-[11px] font-bold font-mono tracking-[0.08em] uppercase"
-          style={{ color: "var(--text-dim)" }}
-        >
-          Regression Tests
-        </span>
-        <span
-          className="text-[11px] font-mono px-1.5 py-0.5 rounded-[4px]"
-          style={{ background: "var(--bg-surface-2)", color: "var(--accent-text)", border: "1px solid var(--border-dim)" }}
-        >
-          {regressions.length}
-        </span>
-      </div>
-      <Panel>
-        {loading ? (
-          <SkeletonTable rows={4} />
-        ) : (
-          <div className="overflow-auto">
-            {regressions.length === 0 ? (
-              <div
-                className="px-4 py-8 text-center text-[13px]"
-                style={{ color: "var(--text-dim)" }}
-              >
-                No regression tests saved yet. Open a trace and click{" "}
-                <span style={{ color: "var(--accent-text)" }}>Save as Regression Test</span> to add one.
-              </div>
-            ) : (
-              <table className="w-full text-[13px] border-collapse">
-                <thead>
-                  <tr style={{ background: "var(--bg-surface-2)", borderBottom: "1px solid var(--border)" }}>
-                    {["Source Trace", "Test Name", "Expected Status", "Created"].map((h) => (
-                      <th
-                        key={h}
-                        className="px-3.5 py-2.5 text-left text-[10px] font-bold font-mono tracking-[0.08em] uppercase whitespace-nowrap text-slate-400"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border-dim)]">
-                  {regressions.map((reg) => (
-                    <tr
-                      key={reg.id}
-                      onClick={() => navigate(`/traces/${encodeURIComponent(reg.source_trace_id)}`)}
-                      className="cursor-pointer transition-colors duration-120 hover:bg-white/[0.04] group"
-                    >
-                      <td className="px-3.5 py-3 whitespace-nowrap">
-                        <span
-                          className="font-mono text-[12px] font-semibold text-[#A78BFA] group-hover:text-white transition-colors"
-                          title={reg.source_trace_id}
-                        >
-                          {reg.source_trace_id.slice(0, 10)}…
-                        </span>
-                      </td>
-                      <td className="px-3.5 py-3 text-slate-200 font-medium max-w-[280px] truncate" title={reg.name}>
-                        {reg.name}
-                      </td>
-                      <td className="px-3.5 py-3 whitespace-nowrap">
-                        <StatusBadge code={reg.expected_status} />
-                      </td>
-                      <td
-                        className="px-3.5 py-3 whitespace-nowrap text-[12px] text-slate-400 font-mono"
-                        title={new Date(reg.created_at > 1e12 ? reg.created_at : reg.created_at * 1000).toLocaleString()}
-                      >
-                        {relativeTime(reg.created_at)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
-      </Panel>
     </div>
   );
 }

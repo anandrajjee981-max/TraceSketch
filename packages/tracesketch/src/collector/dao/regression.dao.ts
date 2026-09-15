@@ -39,13 +39,7 @@ export function getRegressionById(id: string) {
 }
 
 export function getAllRegressions(limit = 100) {
-  // Join with traces so we always have a valid parent; orphans are excluded
   return db
-    .prepare(
-      `SELECT r.* FROM regression_tests r
-       INNER JOIN traces t ON t.trace_id = r.source_trace_id
-       ORDER BY r.created_at DESC
-       LIMIT ?`
-    )
+    .prepare("SELECT * FROM regression_tests ORDER BY created_at DESC LIMIT ?")
     .all(limit);
 }

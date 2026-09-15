@@ -7,10 +7,8 @@ import { stripUnsafeHeaders } from "../utils/headers";
 export async function postregression(req: Request, res: Response) {
   try {
     const traceId = Array.isArray(req.params.traceId) ? req.params.traceId[0] : req.params.traceId;
-
-    const trace = getTrace(traceId);
-    if (!trace) {
-      return res.status(404).json({ message: "trace not found" });
+    if (!traceId) {
+      return res.status(400).json({ message: "traceId is required" });
     }
     const { name, expected_status, expected_schema } = req.body as {
       name?: unknown;
@@ -50,24 +48,21 @@ export async function postregression(req: Request, res: Response) {
 }
 
 export async function getregression(req:Request,res:Response){
-try{
-const sourceTraceId = Array.isArray(req.params.traceId)
-  ? req.params.traceId[0]
-  : req.params.traceId;
+  try {
+    const sourceTraceId = Array.isArray(req.params.traceId)
+      ? req.params.traceId[0]
+      : req.params.traceId;
 
-const trace = getTrace(sourceTraceId);
-if (!trace) {
-  return res.status(404).json({ message: "trace not found" });
-}
+    if (!sourceTraceId) {
+      return res.status(400).json({ message: "traceId is required" });
+    }
 
-const regressions = getRegressionsByTraceId(sourceTraceId);
-return res.status(200).json({ message: "regressions found", regressions });
-}
-catch(err){
-console.error(err);
-return res.status(500).json({ message: "internal server error" });
-}
-
+    const regressions = getRegressionsByTraceId(sourceTraceId);
+    return res.status(200).json({ message: "regressions found", regressions });
+  } catch (err) {
+    console.error("[getregression]", err);
+    return res.status(500).json({ message: "internal server error" });
+  }
 }
 
 function buildReplayHeaders(rawHeaders: Record<string, unknown>): Record<string, string> {

@@ -254,12 +254,14 @@ export function TraceDetail() {
     setRegSaving(true);
     setRegError(null);
     try {
-      await createRegression(trace.trace_id, nameTrimmed, Number(regExpected), { instanceId, apiBaseUrl });
+      const res = await createRegression(trace.trace_id, nameTrimmed, Number(regExpected), { instanceId, apiBaseUrl });
       setRegSavedMsg("Regression test saved");
       setShowRegressionForm(false);
       setRegName("");
       setRegExpected(200);
-      // refresh list — await so UI updates before hiding
+      if (res.regression) {
+        setRegressions((prev) => [res.regression as RegressionTest, ...prev.filter((r) => r.id !== (res.regression as RegressionTest).id)]);
+      }
       await fetchRegressions();
       setTimeout(() => setRegSavedMsg(null), 3000);
     } catch (err) {

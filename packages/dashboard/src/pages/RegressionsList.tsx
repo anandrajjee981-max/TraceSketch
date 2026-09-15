@@ -57,8 +57,8 @@ export function RegressionsList() {
   }, [instanceId, apiBaseUrl]);
 
   const handleRun = async (reg: RegressionTest) => {
-    const current = runStates[reg.id] ?? { targetUrl: "http://localhost:6001", loading: false, error: null, result: null };
-    const targetUrl = current.targetUrl.trim() || "http://localhost:6001";
+    const current = runStates[reg.id] ?? { targetUrl: "", loading: false, error: null, result: null };
+    const targetUrl = current.targetUrl.trim() || "";
 
     setRunStates((prev) => ({
       ...prev,
@@ -177,7 +177,7 @@ export function RegressionsList() {
               <tbody className="divide-y divide-[var(--border-dim)]">
                 {filtered.map((reg) => {
                   const rState = runStates[reg.id] || {
-                    targetUrl: "http://localhost:6001",
+                    targetUrl: "",
                     loading: false,
                     error: null,
                     result: null,
