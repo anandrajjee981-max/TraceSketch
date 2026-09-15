@@ -7,7 +7,10 @@
   "bin": {
     "tracesketch": "dist/cli.js"
   },
-  "files": ["dist", "dashboard-dist"],
+  "files": [
+    "dist",
+    "dashboard-dist"
+  ],
   "scripts": {
     "build": "tsc"
   },
@@ -18,7 +21,7 @@
     "axios": "^1.20.0",
     "better-sqlite3": "^13.0.3",
     "cors": "^2.8.6",
-    "express": "^5.1.0",
+    "express": "^4.0.0 || ^5.0.0",
     "node-cron": "^4.6.0"
   },
   "devDependencies": {

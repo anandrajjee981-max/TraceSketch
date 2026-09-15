@@ -9,6 +9,7 @@ export function WebsiteLanding() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"express" | "cli" | "nextjs">("express");
   const [demoScenario, setDemoScenario] = useState<"checkout" | "auth" | "db">("checkout");
+  const [demoTraceId, setDemoTraceId] = useState<string | null>(null);
   const [replaying, setReplaying] = useState(false);
   const [replaySuccess, setReplaySuccess] = useState(false);
 
@@ -356,10 +357,11 @@ export function WebsiteLanding() {
 
             {/* Bottom action inside simulator */}
             <div className="mt-4 pt-3 border-t border-[#262E44] flex items-center justify-between text-xs text-slate-400">
-              <span>Trace ID: <code className="text-[#A78BFA]">tr_demo_{demoScenario}_981a</code></span>
+              <span>Trace ID: <code className="text-[#A78BFA]">{demoTraceId ?? "generated on inspect"}</code></span>
               <button
                 onClick={() => {
-                  simulateTrace(demoScenario === "checkout" ? "checkout-500" : demoScenario === "auth" ? "auth-401" : "db-slow");
+                  const trace = simulateTrace(demoScenario === "checkout" ? "checkout-500" : demoScenario === "auth" ? "auth-401" : "db-slow");
+                  setDemoTraceId(trace.trace_id);
                   navigate("/");
                 }}
                 className="text-[#6C47FF] hover:text-[#9A72FF] font-medium flex items-center gap-1 transition-colors"

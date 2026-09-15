@@ -160,22 +160,34 @@ export function TracesList() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    getTraces({ instanceId, apiBaseUrl })
-      .then((res) => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    async function fetchTraces(isPoll = false) {
+      if (!isPoll) setLoading(true);
+      try {
+        const res = await getTraces({ instanceId, apiBaseUrl });
         if (!cancelled) {
           setApiTraces(res.traces ?? []);
           setError(null);
         }
-      })
-      .catch((e) => {
+      } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      } finally {
+        if (!cancelled && !isPoll) setLoading(false);
+      }
+    }
+
+    fetchTraces(false);
+    // Poll every 3s so sketch CLI traces appear without manual refresh
+    interval = setInterval(() => fetchTraces(true), 3000);
+    // Also refetch when tab becomes visible
+    const onVis = () => { if (document.visibilityState === 'visible') fetchTraces(true); };
+    document.addEventListener('visibilitychange', onVis);
+
     return () => {
       cancelled = true;
+      if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVis);
     };
   }, [instanceId, apiBaseUrl]);
 

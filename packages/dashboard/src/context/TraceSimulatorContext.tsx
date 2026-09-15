@@ -139,29 +139,34 @@ const PRESET_EVENTS: Record<string, TraceEvent[]> = {
   ],
 };
 
+void PRESET_TRACES;
+void PRESET_EVENTS;
+
 export function TraceSimulatorProvider({ children }: { children: ReactNode }) {
   const [simulatedTraces, setSimulatedTraces] = useState<Trace[]>(() => {
     const cached = sessionStorage.getItem("ts_simulated_traces");
     if (cached) {
       try {
-        return JSON.parse(cached);
+        const traces = JSON.parse(cached) as Trace[];
+        return traces.filter((trace) => trace.trace_id.startsWith("tr_sim_"));
       } catch {
         // fallback
       }
     }
-    return PRESET_TRACES;
+    return [];
   });
 
   const [simulatedEvents, setSimulatedEvents] = useState<Record<string, TraceEvent[]>>(() => {
     const cached = sessionStorage.getItem("ts_simulated_events");
     if (cached) {
       try {
-        return JSON.parse(cached);
+        const events = JSON.parse(cached) as Record<string, TraceEvent[]>;
+        return Object.fromEntries(Object.entries(events).filter(([traceId]) => traceId.startsWith("tr_sim_")));
       } catch {
         // fallback
       }
     }
-    return PRESET_EVENTS;
+    return {};
   });
 
   useEffect(() => {

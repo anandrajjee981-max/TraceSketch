@@ -7,8 +7,9 @@ interface Config {
   error: string | null;
 }
 
-// VITE_COLLECTOR_URL="" means use Vite proxy (relative). Otherwise absolute.
-const envBase = (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_COLLECTOR_URL ?? "";
+// VITE_COLLECTOR_URL="" means use Vite proxy in development. Packaged builds use the local collector.
+const env = (import.meta as unknown as { env: Record<string, string | boolean | undefined> }).env;
+const envBase = (env?.VITE_COLLECTOR_URL ?? (env?.PROD ? "http://localhost:4000" : "")) as string;
 // Keep placeholder until real instance fetched — reads will still work because collector GETs don't auth
 const placeholder = (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_INSTANCE_ID ?? "inst_placeholder_12345";
 

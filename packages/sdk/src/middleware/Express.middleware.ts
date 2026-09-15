@@ -19,6 +19,11 @@ function getInstanceCredentials() {
   }
 }
 export function expressmiddleware(req:Request,res:Response,next:NextFunction){
+    if (req.headers['x-tracesketch-cli'] === 'true') {
+      next();
+      return;
+    }
+
     // STEP 1: Request shuru hote hi note karo
     const startTime = Date.now();
 

@@ -3,7 +3,9 @@ import type { TracesResponse, TraceResponse, TimelineResponse, ReplaysResponse, 
 // Base is read at runtime: VITE_COLLECTOR_URL="" -> use relative via Vite proxy; else absolute.
 function getApiBase(): string {
   const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
-  return (env?.VITE_COLLECTOR_URL ?? "").replace(/\/$/, "");
+  const configuredBase = env?.VITE_COLLECTOR_URL;
+  const defaultBase = env?.PROD ? "http://localhost:4000" : "";
+  return (configuredBase ?? defaultBase).replace(/\/$/, "");
 }
 
 function getInstanceId(): string {
@@ -91,6 +93,12 @@ export function getAllReplays(opts?: { instanceId?: string; apiBaseUrl?: string;
   const q = opts?.limit ? `?limit=${opts.limit}` : "";
   return fetchJson<ReplaysResponse>(apiUrl(`/traces/replays${q}`, opts?.apiBaseUrl), opts?.instanceId);
 }
+
+export function getAllRegressions(opts?: { instanceId?: string; apiBaseUrl?: string; limit?: number }): Promise<RegressionsResponse> {
+  const q = opts?.limit ? `?limit=${opts.limit}` : "";
+  return fetchJson<RegressionsResponse>(apiUrl(`/traces/regressions${q}`, opts?.apiBaseUrl), opts?.instanceId);
+}
+
 
 // ---- Regression Tests ----
 export async function createRegression(
