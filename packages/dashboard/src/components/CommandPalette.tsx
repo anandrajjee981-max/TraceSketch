@@ -79,6 +79,18 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
       },
     },
     {
+      id: "nav-regressions",
+      category: "Navigation",
+      title: "Go to Regression Suite",
+      subtitle: "View & execute saved API regression tests",
+      icon: "🧪",
+      badge: "Suite",
+      run: () => {
+        navigate("/regressions");
+        onClose();
+      },
+    },
+    {
       id: "nav-settings",
       category: "Navigation",
       title: "Go to Settings & Instance Config",

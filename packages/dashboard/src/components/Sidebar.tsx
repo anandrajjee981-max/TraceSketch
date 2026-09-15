@@ -23,6 +23,17 @@ function IconReplay({ active }: { active?: boolean }) {
   );
 }
 
+function IconRegression({ active }: { active?: boolean }) {
+  const stroke = active ? "#A78BFA" : "var(--text-dim)";
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0">
+      <path d="M2.5 13.5H13.5" stroke={stroke} strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M4 10.5L7 6.5L9.5 9L13.5 3.5" stroke={stroke} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="13.5" cy="3.5" r="1.2" fill={stroke} />
+    </svg>
+  );
+}
+
 function IconSettings({ active }: { active?: boolean }) {
   const stroke = active ? "#A78BFA" : "var(--text-dim)";
   return (
@@ -172,6 +183,30 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             >
               <IconReplay active={isActive} />
               {!collapsed && <span>Replays</span>}
+            </span>
+          )}
+        </NavLink>
+
+        <NavLink to="/regressions" style={{ textDecoration: "none" }}>
+          {({ isActive }: { isActive: boolean }) => (
+            <span
+              style={navItemStyle(isActive)}
+              className={isActive ? "ts-nav-active" : ""}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  (e.currentTarget as HTMLSpanElement).style.background = "var(--bg-surface-2)";
+                  (e.currentTarget as HTMLSpanElement).style.color = "var(--text-primary)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  (e.currentTarget as HTMLSpanElement).style.background = "transparent";
+                  (e.currentTarget as HTMLSpanElement).style.color = "var(--text-secondary)";
+                }
+              }}
+            >
+              <IconRegression active={isActive} />
+              {!collapsed && <span>Regressions</span>}
             </span>
           )}
         </NavLink>

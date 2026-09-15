@@ -5,6 +5,7 @@ import { Layout } from "./components/Layout";
 import { TracesList } from "./pages/TracesList";
 import { TraceDetail } from "./pages/TraceDetail";
 import { ReplaysList } from "./pages/ReplaysList";
+import { RegressionsList } from "./pages/RegressionsList";
 import { Settings } from "./pages/Settings";
 import { WebsiteLanding } from "./pages/WebsiteLanding";
 
@@ -21,6 +22,7 @@ export default function App() {
             <Route element={<Layout />}>
               <Route path="/" element={<TracesList />} />
               <Route path="/replays" element={<ReplaysList />} />
+              <Route path="/regressions" element={<RegressionsList />} />
               <Route path="/traces/:traceId" element={<TraceDetail />} />
               <Route path="/settings" element={<Settings />} />
             </Route>

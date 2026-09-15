@@ -139,8 +139,7 @@ const PRESET_EVENTS: Record<string, TraceEvent[]> = {
   ],
 };
 
-void PRESET_TRACES;
-void PRESET_EVENTS;
+export { PRESET_TRACES, PRESET_EVENTS };
 
 export function TraceSimulatorProvider({ children }: { children: ReactNode }) {
   const [simulatedTraces, setSimulatedTraces] = useState<Trace[]>(() => {
@@ -339,7 +338,7 @@ export function TraceSimulatorProvider({ children }: { children: ReactNode }) {
   };
 
   const getEventsForTrace = (traceId: string): TraceEvent[] => {
-    return simulatedEvents[traceId] || [];
+    return simulatedEvents[traceId] || PRESET_EVENTS[traceId] || [];
   };
 
   return (
