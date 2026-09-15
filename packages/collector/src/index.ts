@@ -50,9 +50,9 @@ app.get("/instance", (_req, res) => {
 });
 
 app.use("/traces", replayrouter);
+app.use("/traces", regressionrouter);
 app.use("/traces", tracerouter);
 app.use("/traces", eventsRouter);
-app.use("/traces",regressionrouter)
 
 cron.schedule('0 */2 * * *', () => {
   console.log('Running hourly trace cleanup task...');

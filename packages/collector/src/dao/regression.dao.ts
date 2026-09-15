@@ -25,7 +25,7 @@ export function insertregression(
     return false;
   }
 }
- 
+
 export function getRegressionsByTraceId(sourceTraceId: string) {
   return db
     .prepare("SELECT * FROM regression_tests WHERE source_trace_id = ? ORDER BY created_at DESC")
@@ -38,7 +38,13 @@ export function getRegressionById(id: string) {
     .get(id);
 }
 
-
-
-
-
+export function getAllRegressions(limit = 100) {
+  return db
+    .prepare(
+      `SELECT r.* FROM regression_tests r
+       INNER JOIN traces t ON t.trace_id = r.source_trace_id
+       ORDER BY r.created_at DESC
+       LIMIT ?`
+    )
+    .all(limit);
+}

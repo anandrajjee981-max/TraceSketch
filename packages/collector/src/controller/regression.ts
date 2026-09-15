@@ -1,6 +1,6 @@
 import { Request,Response } from "express";
 import { getTrace } from "../dao/trace.dao";
-import { getRegressionsByTraceId, insertregression ,getRegressionById} from "../dao/regression.dao";
+import { getRegressionsByTraceId, insertregression, getRegressionById, getAllRegressions } from "../dao/regression.dao";
 import { stripUnsafeHeaders } from "../utils/headers";
 
 
@@ -203,12 +203,13 @@ try {
   }
 }
 
-
-
-
-
-
-
-
-
-
+export async function listAllRegressions(req: Request, res: Response) {
+  try {
+    const limit = Number(req.query.limit);
+    const regressions = getAllRegressions(Number.isFinite(limit) && limit > 0 ? limit : 100);
+    return res.status(200).json({ message: "regressions found", regressions });
+  } catch (err) {
+    console.error("[listAllRegressions]", err);
+    return res.status(500).json({ message: "internal server error" });
+  }
+}
