@@ -23,39 +23,6 @@ function relativeTime(createdAt: number): string {
   return `${d}d ago`;
 }
 
-const SAMPLE_REPLAYS: ReplayRun[] = [
-  {
-    id: 101,
-    trace_id: "tr_live_f89d3a01",
-    target_base_url: "http://localhost:3000",
-    environment: "development",
-    status_code: 200,
-    duration_ms: 242,
-    result: "completed",
-    created_at: Date.now() - 1000 * 60 * 12,
-  },
-  {
-    id: 102,
-    trace_id: "tr_live_c1044ba9",
-    target_base_url: "http://localhost:3000",
-    environment: "development",
-    status_code: 401,
-    duration_ms: 78,
-    result: "completed",
-    created_at: Date.now() - 1000 * 60 * 45,
-  },
-];
-
-const SAMPLE_REGRESSIONS: RegressionTest[] = [
-  {
-    id: 1,
-    source_trace_id: "tr_live_f89d3a01",
-    name: "Checkout should return 200",
-    expected_status: 200,
-    created_at: Date.now() - 1000 * 60 * 30,
-  },
-];
-
 export function ReplaysList() {
   const navigate = useNavigate();
   const { instanceId, apiBaseUrl } = useConfig();
@@ -74,21 +41,21 @@ export function ReplaysList() {
       ]);
 
       const fetchedReplays =
-        replaysRes.status === "fulfilled" && replaysRes.value.replays?.length > 0
+        replaysRes.status === "fulfilled" && Array.isArray(replaysRes.value.replays)
           ? replaysRes.value.replays
-          : SAMPLE_REPLAYS;
+          : [];
 
       const fetchedRegressions =
-        regressionsRes.status === "fulfilled" && regressionsRes.value.regressions?.length > 0
+        regressionsRes.status === "fulfilled" && Array.isArray(regressionsRes.value.regressions)
           ? regressionsRes.value.regressions
-          : SAMPLE_REGRESSIONS;
+          : [];
 
       setReplays(fetchedReplays);
       setRegressions(fetchedRegressions);
-    } catch {
-      // Graceful fallback to sample data in standalone/offline mode
-      setReplays(SAMPLE_REPLAYS);
-      setRegressions(SAMPLE_REGRESSIONS);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setReplays([]);
+      setRegressions([]);
     } finally {
       setLoading(false);
     }
@@ -169,6 +136,14 @@ export function ReplaysList() {
                 </button>
               }
             />
+          </div>
+        ) : replays.length === 0 ? (
+          <div
+            className="px-4 py-8 text-center text-[13px]"
+            style={{ color: "var(--text-dim)" }}
+          >
+            No replays executed yet. Open a trace and click{" "}
+            <span style={{ color: "var(--accent-text)" }}>Replay Request</span> to test your server.
           </div>
         ) : (
           <div className="overflow-auto">

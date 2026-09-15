@@ -11,136 +11,6 @@ export interface TraceSimulatorContextType {
 
 const TraceSimulatorContext = createContext<TraceSimulatorContextType | undefined>(undefined);
 
-const PRESET_TRACES: Trace[] = [
-  {
-    id: 901,
-    trace_id: "tr_live_f89d3a01",
-    instance_id: "inst_local_dev",
-    method: "POST",
-    path: "/api/v1/checkout/charge",
-    status_code: 500,
-    duration_ms: 342,
-    environment: "development",
-    created_at: Date.now() - 1000 * 45,
-    expires_at: Date.now() + 1000 * 86400 * 7,
-  },
-  {
-    id: 902,
-    trace_id: "tr_live_b72c918e",
-    instance_id: "inst_local_dev",
-    method: "GET",
-    path: "/api/v1/users/me/workspace",
-    status_code: 200,
-    duration_ms: 48,
-    environment: "development",
-    created_at: Date.now() - 1000 * 120,
-    expires_at: Date.now() + 1000 * 86400 * 7,
-  },
-  {
-    id: 903,
-    trace_id: "tr_live_c1044ba9",
-    instance_id: "inst_local_dev",
-    method: "POST",
-    path: "/auth/oauth/token",
-    status_code: 401,
-    duration_ms: 82,
-    environment: "development",
-    created_at: Date.now() - 1000 * 240,
-    expires_at: Date.now() + 1000 * 86400 * 7,
-  },
-  {
-    id: 904,
-    trace_id: "tr_live_e99120bc",
-    instance_id: "inst_local_dev",
-    method: "GET",
-    path: "/api/analytics/realtime",
-    status_code: 200,
-    duration_ms: 18,
-    environment: "development",
-    created_at: Date.now() - 1000 * 360,
-    expires_at: Date.now() + 1000 * 86400 * 7,
-  },
-];
-
-const PRESET_EVENTS: Record<string, TraceEvent[]> = {
-  tr_live_f89d3a01: [
-    {
-      id: 1,
-      trace_id: "tr_live_f89d3a01",
-      event_type: "http",
-      service: "api-gateway",
-      operation: "POST /api/v1/checkout/charge",
-      duration_ms: 342,
-      metadata: JSON.stringify({ ip: "127.0.0.1", user_agent: "TraceSketch-Client/0.1" }),
-      created_at: Date.now() - 1000 * 45,
-    },
-    {
-      id: 2,
-      trace_id: "tr_live_f89d3a01",
-      event_type: "db",
-      service: "postgres",
-      operation: "SELECT * FROM orders WHERE id = $1",
-      duration_ms: 64,
-      metadata: JSON.stringify({ query: "SELECT * FROM orders WHERE id = 'ord_9182'", rows: 1 }),
-      created_at: Date.now() - 1000 * 45 + 12,
-    },
-    {
-      id: 3,
-      trace_id: "tr_live_f89d3a01",
-      event_type: "cache",
-      service: "redis",
-      operation: "HGET user:rate_limit",
-      duration_ms: 4,
-      metadata: JSON.stringify({ key: "rate_limit:user_789", hit: true }),
-      created_at: Date.now() - 1000 * 45 + 80,
-    },
-    {
-      id: 4,
-      trace_id: "tr_live_f89d3a01",
-      event_type: "external",
-      service: "stripe-api",
-      operation: "POST /v1/payment_intents/pi_991823/confirm",
-      duration_ms: 220,
-      metadata: JSON.stringify({ error: "card_declined", decline_code: "insufficient_funds" }),
-      created_at: Date.now() - 1000 * 45 + 92,
-    },
-  ],
-  tr_live_b72c918e: [
-    {
-      id: 5,
-      trace_id: "tr_live_b72c918e",
-      event_type: "http",
-      service: "api-gateway",
-      operation: "GET /api/v1/users/me/workspace",
-      duration_ms: 48,
-      metadata: JSON.stringify({ user_id: "usr_9918" }),
-      created_at: Date.now() - 1000 * 120,
-    },
-    {
-      id: 6,
-      trace_id: "tr_live_b72c918e",
-      event_type: "cache",
-      service: "redis",
-      operation: "GET workspace:usr_9918",
-      duration_ms: 3,
-      metadata: JSON.stringify({ hit: true }),
-      created_at: Date.now() - 1000 * 120 + 4,
-    },
-    {
-      id: 7,
-      trace_id: "tr_live_b72c918e",
-      event_type: "db",
-      service: "sqlite",
-      operation: "SELECT * FROM permissions WHERE user_id = ?",
-      duration_ms: 12,
-      metadata: JSON.stringify({ rows: 3 }),
-      created_at: Date.now() - 1000 * 120 + 10,
-    },
-  ],
-};
-
-export { PRESET_TRACES, PRESET_EVENTS };
-
 export function TraceSimulatorProvider({ children }: { children: ReactNode }) {
   const [simulatedTraces, setSimulatedTraces] = useState<Trace[]>(() => {
     const cached = sessionStorage.getItem("ts_simulated_traces");
@@ -338,7 +208,7 @@ export function TraceSimulatorProvider({ children }: { children: ReactNode }) {
   };
 
   const getEventsForTrace = (traceId: string): TraceEvent[] => {
-    return simulatedEvents[traceId] || PRESET_EVENTS[traceId] || [];
+    return simulatedEvents[traceId] || [];
   };
 
   return (

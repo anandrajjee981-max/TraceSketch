@@ -23,30 +23,6 @@ function relativeTime(createdAt: number): string {
   return `${d}d ago`;
 }
 
-const SAMPLE_REGRESSIONS: RegressionTest[] = [
-  {
-    id: 1,
-    source_trace_id: "tr_live_f89d3a01",
-    name: "Checkout Charge Endpoint Regression",
-    expected_status: 500,
-    created_at: Date.now() - 1000 * 60 * 30,
-  },
-  {
-    id: 2,
-    source_trace_id: "tr_live_c1044ba9",
-    name: "Auth Token Revocation Check",
-    expected_status: 401,
-    created_at: Date.now() - 1000 * 60 * 120,
-  },
-  {
-    id: 3,
-    source_trace_id: "tr_live_b72c918e",
-    name: "User Workspace Fetch Status",
-    expected_status: 200,
-    created_at: Date.now() - 1000 * 60 * 300,
-  },
-];
-
 interface RunState {
   targetUrl: string;
   loading: boolean;
@@ -67,13 +43,9 @@ export function RegressionsList() {
     setLoading(true);
     try {
       const res = await getAllRegressions({ instanceId, apiBaseUrl, limit: 100 });
-      if (res.regressions && res.regressions.length > 0) {
-        setRegressions(res.regressions);
-      } else {
-        setRegressions(SAMPLE_REGRESSIONS);
-      }
+      setRegressions(res.regressions ?? []);
     } catch {
-      setRegressions(SAMPLE_REGRESSIONS);
+      setRegressions([]);
     } finally {
       setLoading(false);
     }

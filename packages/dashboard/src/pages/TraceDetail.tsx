@@ -9,7 +9,7 @@ import { Timeline } from "../components/Timeline";
 import { Panel } from "../components/Panel";
 import { ErrorState, EmptyState } from "../components/EmptyState";
 import { useConfig } from "../context/ConfigContext";
-import { useTraceSimulator, PRESET_TRACES } from "../context/TraceSimulatorContext";
+import { useTraceSimulator } from "../context/TraceSimulatorContext";
 
 export function TraceDetail() {
   const { traceId } = useParams<{ traceId: string }>();
@@ -149,10 +149,8 @@ export function TraceDetail() {
   useEffect(() => {
     if (!decodedId) return;
 
-    // Check if trace exists in simulated/preset cache first
-    const localMatch =
-      simulatedTraces.find((t) => t.trace_id === decodedId) ||
-      PRESET_TRACES.find((t) => t.trace_id === decodedId);
+    // Check if trace exists in user simulated traces cache first
+    const localMatch = simulatedTraces.find((t) => t.trace_id === decodedId);
 
     if (localMatch) {
       setTrace(localMatch);
@@ -173,24 +171,9 @@ export function TraceDetail() {
           setErrorTrace(null);
         }
       })
-      .catch(() => {
+      .catch((e) => {
         if (!cancelled) {
-          // Graceful fallback for sample or missing traces so UI doesn't crash with 404
-          const fallbackTrace: Trace = {
-            id: Date.now(),
-            trace_id: decodedId,
-            instance_id: instanceId || "inst_local_dev",
-            method: decodedId.includes("auth") ? "POST" : "GET",
-            path: decodedId.includes("auth") ? "/auth/oauth/token" : "/api/v1/checkout/charge",
-            status_code: decodedId.includes("auth") ? 401 : 200,
-            duration_ms: 180,
-            environment: "development",
-            created_at: Date.now() - 60000,
-            expires_at: Date.now() + 86400000,
-          };
-          setTrace(fallbackTrace);
-          setEvents(getEventsForTrace(decodedId));
-          setErrorTrace(null);
+          setErrorTrace(e instanceof Error ? e.message : String(e));
         }
       })
       .finally(() => {
@@ -205,10 +188,9 @@ export function TraceDetail() {
           setErrorEvents(null);
         }
       })
-      .catch(() => {
+      .catch((e) => {
         if (!cancelled) {
-          setEvents(getEventsForTrace(decodedId));
-          setErrorEvents(null);
+          setErrorEvents(e instanceof Error ? e.message : String(e));
         }
       })
       .finally(() => {
