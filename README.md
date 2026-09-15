@@ -2,8 +2,9 @@
 
 > Stop guessing why your API failed. Capture the request, replay it, fix it, lock it in.
 
----
 
+---
+>npm link https://www.npmjs.com/package/tracesketch
 ## The Problem
 
 An API fails in production. All you get is a 500 error. You don't know what the exact request was, where it failed inside your app, or how to safely try it again. So you guess — copy-paste into Postman, hope you remember every header, hope it reproduces.
