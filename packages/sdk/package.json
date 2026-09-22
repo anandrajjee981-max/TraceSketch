@@ -7,7 +7,7 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev-DEPRECATED-DO-NOT-USE": "tsc --watch"
   },
   "keywords": ["tracing", "debugging", "replay", "regression-testing"],
   "license": "MIT",

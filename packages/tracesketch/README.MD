@@ -151,6 +151,47 @@ Dashboard (port 8470) — view, replay, manage regression tests
 
 ---
 
+## Security
+
+`Replay` makes outbound HTTP requests to a target URL you provide, so it's protected against being misused as an open network proxy:
+
+- Only `http:` and `https:` protocols are allowed
+- The target hostname is resolved and the actual IP is validated — private and reserved network ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local addresses, and cloud metadata endpoints (`169.254.169.254`) are blocked by default, including when a domain name resolves to one of these (DNS rebinding protection)
+- `localhost` / `127.0.0.1` is allowed, since local-first replay against your own machine is the core use case
+- Redirects are not followed automatically — a redirect response is returned as-is rather than silently chased to a new destination
+- Every replay request has a strict timeout
+
+If you find a security issue, please report it privately rather than opening a public issue.
+
+---
+
+## Updating
+
+New versions are published regularly. To update to the latest version:
+
+```bash
+npm install -g tracesketch@latest
+```
+
+If a new version doesn't seem to take effect, your npm cache may be holding an old copy:
+
+```bash
+npm uninstall -g tracesketch
+npm cache clean --force
+npm install -g tracesketch@latest
+```
+
+Open a new terminal window afterward — PATH changes don't apply to terminals that were already open.
+
+To check what version you have versus the latest available:
+
+```bash
+npm list -g tracesketch
+npm view tracesketch version
+```
+
+---
+
 ## Status
 
 Early access. The core loop — capture, replay, regression testing — is tested end to end and works. The API surface may still change as the project grows. Feedback is genuinely welcome.

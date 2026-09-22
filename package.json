@@ -6,9 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=@tracesketch/collector\" \"npm run dev --workspace=@tracesketch/dashboard\"",
-    "dev:collector": "npm run dev --workspace=@tracesketch/collector",
-    "dev:dashboard": "npm run dev --workspace=@tracesketch/dashboard",
+    "dev": "npm run dev --workspace=tracesketch",
     "build": "npm run build --workspaces"
   },
   "devDependencies": {

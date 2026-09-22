@@ -148,6 +148,18 @@ sketch post /api/payment 5000 --body '{"amount":100}'
 - Sensitive fields (passwords, tokens, auth headers) are automatically redacted before anything is stored
 - Traces expire automatically (24 hours by default) and get cleaned up
 
+## Local Development
+
+To develop and test traceSketch locally with watch-mode auto-reloading:
+
+```bash
+npm run dev
+# or from packages/tracesketch:
+cd packages/tracesketch && npm run dev
+```
+
+All active development takes place inside `packages/tracesketch/src/`. The old split packages (`packages/collector`, `packages/sdk`, `packages/dashboard`) are deprecated and inert.
+
 ---
 
 ## Status

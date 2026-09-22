@@ -2,6 +2,8 @@ import { getTrace } from "../dao/trace.dao";
 import { getAllReplays, getReplaysByTraceId, insertReplayRun } from "../dao/replay.dao";
 import { Request, Response } from "express";
 import { stripUnsafeHeaders } from "../utils/headers";
+import { validateUrl } from "   ../../security/url-validator";
+import { resolveAndValidate } from "../../security/ip-validator";
 
 export async function replayTrace(req: Request, res: Response) {
   const targetBaseUrl = typeof req.body?.target_base_url === "string"
@@ -14,6 +16,10 @@ export async function replayTrace(req: Request, res: Response) {
       : req.params.traceId;
     if (!targetBaseUrl) {
       return res.status(400).json({ message: "target_base_url is required" });
+    }
+    const isValid = await validateUrl(targetBaseUrl)
+    if(!isValid){
+      return res.status(400).json({ message: "Invalid target URL" });
     }
 
     const trace = getTrace(traceId);
@@ -40,6 +46,12 @@ export async function replayTrace(req: Request, res: Response) {
 
     // build full URL with query params if present
     let fullUrl = targetBaseUrl.replace(/\/$/, "") + path;
+    const url = new URL(fullUrl);
+    const isresolved = await resolveAndValidate(url.hostname);
+    if(!isresolved){
+      return res.status(400).json({ message: "Target is private/internal" });
+    }
+    
     if (query_params) {
       try {
         const qp = JSON.parse(query_params);
@@ -72,6 +84,7 @@ export async function replayTrace(req: Request, res: Response) {
         headers,
         body,
         signal: controller.signal,
+        redirect:'manual'
       } as RequestInit);
     } catch (fetchErr) {
       clearTimeout(timeout);

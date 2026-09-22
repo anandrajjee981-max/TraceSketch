@@ -1,6 +1,6 @@
 {
   "name": "tracesketch",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Local-first API tracing, replay, and regression testing",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,6 +13,7 @@
     "dashboard-dist"
   ],
   "scripts": {
+    "dev": "tsx watch src/dev.ts",
     "build": "tsc"
   },
   "peerDependencies": {
@@ -31,6 +32,7 @@
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
     "@types/node-cron": "^3.0.11",
+    "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   },
   "publishConfig": {
