@@ -73,7 +73,15 @@ expected_schema TEXT,
 created_at INTEGER NOT NULL,
 FOREIGN KEY (source_trace_id) REFERENCES traces(trace_id) ON DELETE CASCADE
 )
-
+CREATE TABLE group_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_code TEXT UNIQUE NOT NULL,      
+  creator_instance_id TEXT NOT NULL,     
+  joiner_instance_id TEXT,                
+  summary_text TEXT DEFAULT '',           
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL             
+);
 
 
 
