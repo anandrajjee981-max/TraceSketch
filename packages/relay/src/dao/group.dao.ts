@@ -13,7 +13,7 @@ function generateSecureCode(length: number = 4): string {
 
 async function isCodeTaken(code: string): Promise<boolean> {
   const existing = await groupmodel.findOne({ groupCode: code });
-  return !!existing;
+  return !!existing; 
 }
 
 export async function getUniqueSecureCode(): Promise<string> {
@@ -42,8 +42,7 @@ export async function createGroup(creatorInstanceId: string): Promise<string> {
   await groupmodel.create({
     groupCode,
     creatorInstanceId,
-    joinerInstanceId: null,
-    summaryText: ""
+    joinerInstanceId: null
   });
   return groupCode;
 }
@@ -67,4 +66,16 @@ export async function joinGroup(groupCode: string, joinerInstanceId: string): Pr
   await group.save();
 
   return { success: true, message: "Joined successfully" };
+}
+
+export async function checkGroup
+(groupCode:string):Promise<boolean> {
+  const group = await groupmodel.findOne({ groupCode });
+  return !!group;
+
+}
+
+export async function findGroupByCode
+(groupCode:string) {
+  return groupmodel.findOne({ groupCode });
 }

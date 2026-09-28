@@ -14,7 +14,7 @@ export async function createGroupController(req: Request, res: Response) {
       return res.status(409).json({ message: "You already have an active session. Leave it before creating a new one." });
     }
 
-    const groupCode = await createGroup(creatorInstanceId);
+    const groupCode = await createGroup(creatorInstanceId); 
 
     res.status(201).json({ message: "Group created", groupCode });
   } catch (err) {
@@ -48,5 +48,3 @@ export async function joinGroupController(req: Request, res: Response) {
     res.status(500).json({ message: "internal server error" });
   }
 }
-
-
