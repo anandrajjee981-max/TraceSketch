@@ -1,10 +1,13 @@
 import { Request, Response } from "express";
 import { addMessage, getMessages } from "../dao/group-message.dao";
+import { log } from "node:console";
 
 export async function addMessageController(req: Request, res: Response) {
   try {
     const groupCode = req.params.code as string;
     const { instanceId, summaryText } = req.body;
+    const io = req.app.get("io");
+    console.log("Socket.IO instance available:", !!io);
 
     if (!instanceId || !summaryText) {
       return res.status(400).json({ message: "instanceId and summaryText are required" });
