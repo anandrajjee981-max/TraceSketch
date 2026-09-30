@@ -1,10 +1,11 @@
-import groupmodel from "../models/group.model";
-import { randomInt } from 'crypto';
+import groupmodel from "../models/group.model.js";
+import { randomInt } from "node:crypto";
 
-const CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // I, O, 0, 1 excluded
+const CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // I, O, 0, 1 excluded
+const CODE_LENGTH = 4;
 
-function generateSecureCode(length: number = 4): string {
-  let result = '';
+function generateSecureCode(length: number = CODE_LENGTH): string {
+  let result = "";
   for (let i = 0; i < length; i++) {
     result += CHARSET.charAt(randomInt(0, CHARSET.length));
   }
@@ -12,14 +13,14 @@ function generateSecureCode(length: number = 4): string {
 }
 
 async function isCodeTaken(code: string): Promise<boolean> {
-  const existing = await groupmodel.findOne({ groupCode: code });
-  return !!existing; 
+  const existing = await groupmodel.findOne({ groupCode: code }).lean();
+  return !!existing;
 }
 
 export async function getUniqueSecureCode(): Promise<string> {
   let code: string;
   do {
-    code = generateSecureCode(4);
+    code = generateSecureCode(CODE_LENGTH);
   } while (await isCodeTaken(code));
   // Yahan koi manual "reserve" nahi karna - jab createGroup() ye code
   // save karega DB mein, wahi asli reservation ban jayega.
@@ -28,54 +29,113 @@ export async function getUniqueSecureCode(): Promise<string> {
 }
 
 export async function isInstanceInActiveSession(instanceId: string): Promise<boolean> {
-  const existing = await groupmodel.findOne({
-    $or: [
-      { creatorInstanceId: instanceId },
-      { joinerInstanceId: instanceId }
-    ]
-  });
+  const existing = await groupmodel
+    .findOne({
+      $or: [{ creatorInstanceId: instanceId }, { joinerInstanceId: instanceId }],
+    })
+    .lean();
   return !!existing;
 }
 
-export async function createGroup(creatorInstanceId: string): Promise<string> {
-  const groupCode = await getUniqueSecureCode();
-  await groupmodel.create({
+export async function getGroupByInstanceId(instanceId: string): Promise<{ groupCode: string } | null> {
+  const existing = await groupmodel
+    .findOne({
+      $or: [{ creatorInstanceId: instanceId }, { joinerInstanceId: instanceId }],
+    })
+    .lean();
+  if (!existing) return null;
+  return { groupCode: existing.groupCode };
+}
+
+export async function leaveGroup(groupCode: string, instanceId: string): Promise<boolean> {
+  const deleted = await groupmodel.findOneAndDelete({
     groupCode,
-    creatorInstanceId,
-    joinerInstanceId: null
+    $or: [{ creatorInstanceId: instanceId }, { joinerInstanceId: instanceId }],
   });
-  return groupCode;
+  return deleted !== null;
 }
 
-export async function joinGroup(groupCode: string, joinerInstanceId: string): Promise<{ success: boolean; message: string }> {
-  const group = await groupmodel.findOne({ groupCode });
-
-  if (!group) {
-    return { success: false, message: "Group not found or has expired" };
+export async function createGroup(creatorInstanceId: string): Promise<string> {
+  // Retry loop: two creators can roll the same 4-char code in the same
+  // millisecond. The unique index is the real reservation, so on a duplicate
+  // key we simply roll again instead of failing the request.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const groupCode = await getUniqueSecureCode();
+    try {
+      await groupmodel.create({ groupCode, creatorInstanceId, joinerInstanceId: null });
+      return groupCode;
+    } catch (err) {
+      if ((err as { code?: number }).code === 11000) continue;
+      throw err;
+    }
   }
-
-  if (group.joinerInstanceId) {
-    return { success: false, message: "This group is already full" };
-  }
-
-  if (group.creatorInstanceId === joinerInstanceId) {
-    return { success: false, message: "You cannot join your own group" };
-  }
-
-  group.joinerInstanceId = joinerInstanceId;
-  await group.save();
-
-  return { success: true, message: "Joined successfully" };
+  throw new Error("Could not allocate a unique group code. Please retry.");
 }
 
-export async function checkGroup
-(groupCode:string):Promise<boolean> {
-  const group = await groupmodel.findOne({ groupCode });
+export type JoinFailure =
+  | "not_found"
+  | "already_full"
+  | "own_group"
+  | "already_in_session";
+
+export type JoinResult =
+  | { success: true; groupCode: string; message: string }
+  | { success: false; reason: JoinFailure; message: string };
+
+export async function joinGroup(
+  groupCode: string,
+  joinerInstanceId: string,
+): Promise<JoinResult> {
+  // Single atomic claim. A plain find-then-save lets two joiners both pass the
+  // "is it full?" check and then both write, silently overfilling the room.
+  const group = await groupmodel
+    .findOneAndUpdate(
+      { groupCode, joinerInstanceId: null },
+      { $set: { joinerInstanceId } },
+      { new: true },
+    )
+    .lean();
+
+  if (group) return { success: true, groupCode, message: "Joined successfully" };
+
+  // Claim failed - work out exactly why so the caller gets a useful message.
+  const existing = await groupmodel.findOne({ groupCode }).lean();
+  if (!existing) {
+    return { success: false, reason: "not_found", message: "Group not found or has expired" };
+  }
+  if (existing.creatorInstanceId === joinerInstanceId) {
+    return { success: false, reason: "own_group", message: "You cannot join your own group" };
+  }
+  if (existing.joinerInstanceId) {
+    return { success: false, reason: "already_full", message: "This group is already full" };
+  }
+  return { success: false, reason: "already_in_session", message: "You are already in a session" };
+}
+
+export async function checkGroup(groupCode: string): Promise<boolean> {
+  const group = await groupmodel.findOne({ groupCode }).lean();
   return !!group;
-
 }
 
-export async function findGroupByCode
-(groupCode:string) {
-  return groupmodel.findOne({ groupCode });
+export async function findGroupByCode(groupCode: string) {
+  return groupmodel.findOne({ groupCode }).lean();
+}
+
+export type GroupRole = "creator" | "joiner";
+
+/**
+ * Authoritative membership check for the socket layer. A socket must never be
+ * able to enter a room or broadcast into it just because it knows a 4-char
+ * code - the code is only 32^4 combinations, so it is a lookup key, not a
+ * credential. The instanceId must match a seat already claimed in Mongo.
+ */
+export async function getGroupRole(
+  groupCode: string,
+  instanceId: string,
+): Promise<GroupRole | null> {
+  const group = await groupmodel.findOne({ groupCode }).lean();
+  if (!group) return null;
+  if (group.creatorInstanceId === instanceId) return "creator";
+  if (group.joinerInstanceId === instanceId) return "joiner";
+  return null;
 }

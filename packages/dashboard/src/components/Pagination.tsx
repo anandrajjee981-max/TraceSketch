@@ -17,92 +17,64 @@ export function Pagination({ page, pageSize, total, onPageChange }: Props) {
   const adjStart = Math.max(1, end - 4);
   for (let i = adjStart; i <= end; i++) pages.push(i);
 
-  const btnBase: React.CSSProperties = {
-    background: "var(--bg-surface)",
-    border: "1px solid var(--border)",
-    color: "var(--text-secondary)",
-    borderRadius: "5px",
-    cursor: "pointer",
-    transition: "all 0.15s ease",
-    fontSize: "12px",
-    fontWeight: 500,
-  };
-
   return (
-    <div className="flex items-center justify-between py-2.5 text-[12px]">
-      <span style={{ color: "var(--text-dim)" }}>
+    <div className="flex items-center justify-between py-1 text-[12px]">
+      <span className="ts-numeric" style={{ color: "var(--text-dim)" }}>
         {total === 0
           ? "No results"
           : `Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}`}
       </span>
       <div className="flex items-center gap-1.5">
         <button
+          type="button"
           disabled={!canPrev}
           onClick={() => onPageChange(page - 1)}
-          className="px-2.5 py-1 disabled:opacity-40 disabled:cursor-not-allowed"
-          style={btnBase}
-          onMouseEnter={(e) => {
-            if (canPrev) {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent)";
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-primary)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)";
-            (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)";
-          }}
+          className="px-2.5 py-1 ts-input !w-auto !h-[28px] !py-0 ts-numeric disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Previous
         </button>
-        {pages.map((p) => (
-          <button
-            key={p}
-            onClick={() => onPageChange(p)}
-            className="min-w-[28px] h-[28px] px-2 flex items-center justify-center"
-            style={
-              p === page
-                ? {
-                    background: "var(--accent)",
-                    border: "1px solid var(--accent)",
-                    color: "#ffffff",
-                    borderRadius: "5px",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                  }
-                : btnBase
-            }
-            onMouseEnter={(e) => {
-              if (p !== page) {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent)";
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-primary)";
+        {pages.map((p) => {
+          const active = p === page;
+          return (
+            <button
+              key={p}
+              type="button"
+              onClick={() => onPageChange(p)}
+              aria-current={active ? "page" : undefined}
+              className="min-w-[28px] h-[28px] px-2 ts-numeric ts-pop"
+              style={
+                active
+                  ? {
+                      background: "var(--accent)",
+                      border: "1px solid var(--accent)",
+                      color: "#ffffff",
+                      borderRadius: "var(--radius-sm)",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      boxShadow: "0 0 14px -3px rgba(108, 71, 255, 0.6)",
+                    }
+                  : {
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border)",
+                      color: "var(--text-secondary)",
+                      borderRadius: "var(--radius-sm)",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      transition: "border-color 120ms, color 120ms",
+                    }
               }
-            }}
-            onMouseLeave={(e) => {
-              if (p !== page) {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)";
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)";
-              }
-            }}
-          >
-            {p}
-          </button>
-        ))}
+            >
+              {p}
+            </button>
+          );
+        })}
         <button
+          type="button"
           disabled={!canNext}
           onClick={() => onPageChange(page + 1)}
-          className="px-2.5 py-1 disabled:opacity-40 disabled:cursor-not-allowed"
-          style={btnBase}
-          onMouseEnter={(e) => {
-            if (canNext) {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent)";
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-primary)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)";
-            (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)";
-          }}
+          className="px-2.5 py-1 ts-input !w-auto !h-[28px] !py-0 ts-numeric disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Next
         </button>

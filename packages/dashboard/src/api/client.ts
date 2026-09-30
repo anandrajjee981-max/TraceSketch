@@ -8,6 +8,14 @@ function getApiBase(): string {
   return (configuredBase ?? defaultBase).replace(/\/$/, "");
 }
 
+// Relay server base URL — separate Express + Socket.io + MongoDB backend.
+// Override via VITE_RELAY_URL env var; defaults to http://localhost:7000 for local dev.
+export function getRelayBase(): string {
+  const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
+  const RELAY_BASE_URL = env?.VITE_RELAY_URL ?? "http://localhost:7000";
+  return RELAY_BASE_URL.replace(/\/$/, "");
+}
+
 function getInstanceId(): string {
   const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
   return env?.VITE_INSTANCE_ID ?? "inst_placeholder_12345";

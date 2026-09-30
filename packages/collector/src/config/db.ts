@@ -82,7 +82,15 @@ CREATE TABLE group_sessions (
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL             
 );
-
+CREATE TABLE IF NOT EXISTS group_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_code TEXT NOT NULL,
+  instance_id TEXT NOT NULL,
+  entry_type TEXT NOT NULL,
+  trace_id TEXT,
+  note TEXT,
+  saved_at INTEGER NOT NULL
+)
 
 
   `);

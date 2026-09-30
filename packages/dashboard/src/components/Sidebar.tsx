@@ -34,6 +34,18 @@ function IconRegression({ active }: { active?: boolean }) {
   );
 }
 
+function IconRelay({ active }: { active?: boolean }) {
+  const stroke = active ? "#A78BFA" : "var(--text-dim)";
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0">
+      <circle cx="5.5" cy="4.5" r="2" stroke={stroke} strokeWidth="1.3" />
+      <path d="M1.5 13.5c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke={stroke} strokeWidth="1.3" strokeLinecap="round" />
+      <circle cx="11.5" cy="4.5" r="1.5" stroke={stroke} strokeWidth="1.2" />
+      <path d="M13.5 13.5c0-1.7-1-3-2.5-3.5" stroke={stroke} strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function IconSettings({ active }: { active?: boolean }) {
   const stroke = active ? "#A78BFA" : "var(--text-dim)";
   return (
@@ -59,31 +71,55 @@ function IconGlobe({ active }: { active?: boolean }) {
   );
 }
 
-const navItemStyle = (isActive: boolean): React.CSSProperties => ({
-  display: "flex",
-  alignItems: "center",
-  gap: "10px",
-  padding: "8px 12px",
-  borderRadius: "8px",
-  fontSize: "13px",
-  fontWeight: isActive ? 600 : 400,
-  textDecoration: "none",
-  cursor: "pointer",
-  transition: "all 0.15s ease",
-  color: isActive ? "#FFFFFF" : "var(--text-secondary)",
-  background: isActive ? "rgba(108, 71, 255, 0.2)" : "transparent",
-  border: isActive ? "1px solid rgba(108, 71, 255, 0.4)" : "1px solid transparent",
-  boxShadow: isActive ? "0 0 15px -3px rgba(108, 71, 255, 0.3)" : "none",
-});
+const NAV = [
+  { to: "/", label: "Traces", Icon: IconTraces, end: true },
+  { to: "/replays", label: "Replays", Icon: IconReplay, end: false },
+  { to: "/regressions", label: "Regressions", Icon: IconRegression, end: false },
+  { to: "/relay", label: "Relay", Icon: IconRelay, end: false },
+  { to: "/settings", label: "Settings", Icon: IconSettings, end: false },
+] as const;
+
+function NavItem({
+  to,
+  label,
+  Icon,
+  end,
+  collapsed,
+  badge,
+}: {
+  to: string;
+  label: string;
+  Icon: (props: { active?: boolean }) => React.JSX.Element;
+  end: boolean;
+  collapsed: boolean;
+  badge?: string;
+}) {
+  return (
+    <NavLink to={to} end={end} style={{ textDecoration: "none" }} title={collapsed ? label : undefined}>
+      {({ isActive }: { isActive: boolean }) => (
+        <span className="ts-nav-link w-full" data-active={isActive} aria-current={isActive ? "page" : undefined}>
+          <Icon active={isActive} />
+          {!collapsed && (
+            <span className="flex items-center justify-between flex-1 min-w-0">
+              <span className="truncate">{label}</span>
+              {badge && <span className="badge-angular badge-angular-accent">{badge}</span>}
+            </span>
+          )}
+        </span>
+      )}
+    </NavLink>
+  );
+}
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   return (
     <aside
-      className="shrink-0 flex flex-col transition-[width] duration-200 overflow-hidden select-none"
+      className="shrink-0 flex flex-col overflow-hidden select-none"
       style={{
         width: collapsed ? "56px" : "220px",
         background: "var(--bg-surface)",
         borderRight: "1px solid var(--border)",
+        transition: "width 200ms cubic-bezier(0.16, 1, 0.3, 1)",
       }}
     >
       {/* Header — angular brand mark inspired by TS logomark geometry */}
@@ -92,17 +128,15 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         style={{ borderBottom: "1px solid var(--border-dim)" }}
       >
         {collapsed ? (
-          /* Collapsed: just the TS mark, clicking anywhere in header toggles */
           <button
             onClick={onToggle}
             aria-label="Expand sidebar"
-            className="ts-icon-badge mx-auto cursor-pointer"
-            style={{ width: 30, height: 30, padding: 3, border: "none" }}
+            className="ts-icon-badge mx-auto"
+            style={{ width: 30, height: 30, padding: 3, border: "none", cursor: "pointer" }}
           >
             <TSLogoMarkFilled size={24} />
           </button>
         ) : (
-          /* Expanded: TS mark + wordmark + collapse button */
           <>
             <div className="ts-icon-badge shrink-0" style={{ width: 28, height: 28, padding: 2 }}>
               <TSLogoMarkFilled size={24} />
@@ -114,21 +148,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             <button
               onClick={onToggle}
               aria-label="Collapse sidebar"
-              className="w-[22px] h-[22px] rounded-[5px] flex items-center justify-center text-[11px] transition-all shrink-0"
-              style={{
-                color: "var(--text-dim)",
-                background: "rgba(255, 255, 255, 0.03)",
-                border: "1px solid var(--border)",
-                cursor: "pointer",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface-3)";
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-primary)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "rgba(255, 255, 255, 0.03)";
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-dim)";
-              }}
+              className="w-[22px] h-[22px] rounded-[5px] flex items-center justify-center text-[11px] shrink-0 btn-ghost !px-0 !py-0"
             >
               «
             </button>
@@ -136,146 +156,29 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         )}
       </div>
 
-
-      {/* Nav links */}
-      <nav className="p-2.5 flex flex-col gap-1">
-        <NavLink to="/" end style={{ textDecoration: "none" }}>
-          {({ isActive }: { isActive: boolean }) => (
-            <span
-              style={navItemStyle(isActive)}
-              className={isActive ? "ts-nav-active" : ""}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLSpanElement).style.background = "var(--bg-surface-2)";
-                  (e.currentTarget as HTMLSpanElement).style.color = "var(--text-primary)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLSpanElement).style.background = "transparent";
-                  (e.currentTarget as HTMLSpanElement).style.color = "var(--text-secondary)";
-                }
-              }}
-            >
-              <IconTraces active={isActive} />
-              {!collapsed && <span>Traces</span>}
-            </span>
-          )}
-        </NavLink>
-
-        <NavLink to="/replays" style={{ textDecoration: "none" }}>
-          {({ isActive }: { isActive: boolean }) => (
-            <span
-              style={navItemStyle(isActive)}
-              className={isActive ? "ts-nav-active" : ""}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLSpanElement).style.background = "var(--bg-surface-2)";
-                  (e.currentTarget as HTMLSpanElement).style.color = "var(--text-primary)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLSpanElement).style.background = "transparent";
-                  (e.currentTarget as HTMLSpanElement).style.color = "var(--text-secondary)";
-                }
-              }}
-            >
-              <IconReplay active={isActive} />
-              {!collapsed && <span>Replays</span>}
-            </span>
-          )}
-        </NavLink>
-
-        <NavLink to="/regressions" style={{ textDecoration: "none" }}>
-          {({ isActive }: { isActive: boolean }) => (
-            <span
-              style={navItemStyle(isActive)}
-              className={isActive ? "ts-nav-active" : ""}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLSpanElement).style.background = "var(--bg-surface-2)";
-                  (e.currentTarget as HTMLSpanElement).style.color = "var(--text-primary)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLSpanElement).style.background = "transparent";
-                  (e.currentTarget as HTMLSpanElement).style.color = "var(--text-secondary)";
-                }
-              }}
-            >
-              <IconRegression active={isActive} />
-              {!collapsed && <span>Regressions</span>}
-            </span>
-          )}
-        </NavLink>
-
-        <NavLink to="/settings" style={{ textDecoration: "none" }}>
-          {({ isActive }: { isActive: boolean }) => (
-            <span
-              style={navItemStyle(isActive)}
-              className={isActive ? "ts-nav-active" : ""}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLSpanElement).style.background = "var(--bg-surface-2)";
-                  (e.currentTarget as HTMLSpanElement).style.color = "var(--text-primary)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLSpanElement).style.background = "transparent";
-                  (e.currentTarget as HTMLSpanElement).style.color = "var(--text-secondary)";
-                }
-              }}
-            >
-              <IconSettings active={isActive} />
-              {!collapsed && <span>Settings</span>}
-            </span>
-          )}
-        </NavLink>
+      <nav className="p-2.5 flex flex-col gap-1" aria-label="Primary">
+        {NAV.map((item) => (
+          <NavItem key={item.to} {...item} collapsed={collapsed} />
+        ))}
 
         {/* Angular TS divider — skewed like the T's parallelogram top bar */}
         <div className="my-2 mx-1">
           <div className="ts-divider" />
         </div>
 
-        <NavLink to="/overview" style={{ textDecoration: "none" }}>
-          {({ isActive }: { isActive: boolean }) => (
-            <span
-              style={navItemStyle(isActive)}
-              className={isActive ? "ts-nav-active" : ""}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLSpanElement).style.background = "var(--bg-surface-2)";
-                  (e.currentTarget as HTMLSpanElement).style.color = "var(--text-primary)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLSpanElement).style.background = "transparent";
-                  (e.currentTarget as HTMLSpanElement).style.color = "var(--text-secondary)";
-                }
-              }}
-            >
-              <IconGlobe active={isActive} />
-              {!collapsed && (
-                <div className="flex items-center justify-between flex-1">
-                  <span>Product Website</span>
-                  {/* Angular parallelogram "NEW" badge inspired by logo geometry */}
-                  <span className="badge-angular badge-angular-accent">
-                    NEW
-                  </span>
-                </div>
-              )}
-            </span>
-          )}
-        </NavLink>
+        <NavItem
+          to="/overview"
+          label="Product Website"
+          Icon={IconGlobe}
+          end={false}
+          collapsed={collapsed}
+          badge="NEW"
+        />
       </nav>
 
-      {/* Gen-Z / Developer Status Card in Sidebar */}
+      {/* Local-First status card */}
       {!collapsed && (
-        <div className="mt-auto p-3 m-2 rounded-[8px] bg-[#141828] border border-[#262E44]">
+        <div className="mt-auto p-3 m-2 rounded-[8px] ts-card" style={{ background: "var(--bg-surface-2)" }}>
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2 h-2 rounded-full bg-[#10B981] shadow-[0_0_6px_#10B981]" />
             <span className="text-[11px] font-mono font-bold text-white">Local-First Mode</span>
@@ -284,14 +187,16 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             SQLite database active. 0 cloud telemetry sent.
           </p>
           <div className="mt-2 text-[9px] text-[#A78BFA] font-mono">
-            Press <kbd className="bg-white/10 px-1 py-0.5 rounded text-white">⌘K</kbd> for quick actions
+            Press <kbd className="ts-kbd">⌘K</kbd> for quick actions
           </div>
         </div>
       )}
 
-      {/* Footer version */}
       {!collapsed && (
-        <div className="p-3 border-t border-[var(--border-dim)] flex items-center justify-between text-[11px] text-slate-500 font-mono">
+        <div
+          className="p-3 flex items-center justify-between text-[11px] font-mono ts-numeric"
+          style={{ borderTop: "1px solid var(--border-dim)", color: "var(--text-dim)" }}
+        >
           <span>traceSketch</span>
           <span>v0.0.1</span>
         </div>

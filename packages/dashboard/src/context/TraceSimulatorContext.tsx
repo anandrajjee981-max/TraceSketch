@@ -52,11 +52,11 @@ export function TraceSimulatorProvider({ children }: { children: ReactNode }) {
     const hex = Math.random().toString(16).substring(2, 8);
     const traceId = `tr_sim_${hex}`;
 
-    let method = "POST";
-    let path = "/api/v1/orders/checkout";
-    let statusCode = 500;
-    let durationMs = 384;
-    let events: TraceEvent[] = [];
+    let method: string;
+    let path: string;
+    let statusCode: number;
+    let durationMs: number;
+    let events: TraceEvent[];
 
     if (scenario === "checkout-500") {
       method = "POST";

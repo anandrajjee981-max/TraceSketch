@@ -2,14 +2,50 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getTrace, getTimeline, replayTrace, createRegression, getRegressions, runRegression } from "../api/client";
 import type { Trace, TraceEvent, RegressionTest } from "../types";
-import { StatusBadge } from "../components/StatusBadge";
+import { StatusBadge, ResultBadge } from "../components/StatusBadge";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { SkeletonDetail } from "../components/Skeleton";
 import { Timeline } from "../components/Timeline";
-import { Panel } from "../components/Panel";
 import { ErrorState, EmptyState } from "../components/EmptyState";
+import { Badge, Field, InlineError, InlineSuccess, MetaPill, TableWrap } from "../components/ui";
+import { absoluteTime } from "../lib/format";
 import { useConfig } from "../context/ConfigContext";
 import { useTraceSimulator } from "../context/TraceSimulatorContext";
+
+const EVENT_TYPE_TONE: Record<string, string> = {
+  http: "var(--blue)",
+  db: "var(--green)",
+  cache: "var(--accent-text)",
+  external: "var(--red)",
+  queue: "var(--amber)",
+};
+
+function Section({
+  title,
+  subtitle,
+  actions,
+  children,
+  index,
+}: {
+  title: string;
+  subtitle?: string;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+  index: number;
+}) {
+  return (
+    <section className="ts-card ts-stagger" style={{ ["--stagger-i" as string]: index }}>
+      <div className="ts-card-header">
+        <div className="min-w-0">
+          <div className="ts-card-title">{title}</div>
+          {subtitle && <div className="ts-card-subtitle">{subtitle}</div>}
+        </div>
+        {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export function TraceDetail() {
   const { traceId } = useParams<{ traceId: string }>();
@@ -28,7 +64,10 @@ export function TraceDetail() {
   const [targetBaseUrl, setTargetBaseUrl] = useState("");
   const [replayLoading, setReplayLoading] = useState(false);
   const [replayError, setReplayError] = useState<string | null>(null);
-  const [replayResult, setReplayResult] = useState<{ original: { status_code: number; duration_ms: number }; replay: { status_code: number; duration_ms: number } } | null>(null);
+  const [replayResult, setReplayResult] = useState<{
+    original: { status_code: number; duration_ms: number };
+    replay: { status_code: number; duration_ms: number };
+  } | null>(null);
 
   // Regression save states
   const [showRegressionForm, setShowRegressionForm] = useState(false);
@@ -44,7 +83,18 @@ export function TraceDetail() {
   const [regListError, setRegListError] = useState<string | null>(null);
 
   // Per-row run states
-  const [runForms, setRunForms] = useState<Record<number, { show: boolean; targetUrl: string; loading: boolean; error: string | null; result: { expected_status: number; actual_status: number; passed: boolean } | null }>>({});
+  const [runForms, setRunForms] = useState<
+    Record<
+      number,
+      {
+        show: boolean;
+        targetUrl: string;
+        loading: boolean;
+        error: string | null;
+        result: { expected_status: number; actual_status: number; passed: boolean } | null;
+      }
+    >
+  >({});
 
   // Add Event states
   const [showAddEventForm, setShowAddEventForm] = useState(false);
@@ -260,7 +310,10 @@ export function TraceDetail() {
       setRegName("");
       setRegExpected(200);
       if (res.regression) {
-        setRegressions((prev) => [res.regression as RegressionTest, ...prev.filter((r) => r.id !== (res.regression as RegressionTest).id)]);
+        setRegressions((prev) => [
+          res.regression as RegressionTest,
+          ...prev.filter((r) => r.id !== (res.regression as RegressionTest).id),
+        ]);
       }
       await fetchRegressions();
       setTimeout(() => setRegSavedMsg(null), 3000);
@@ -279,25 +332,43 @@ export function TraceDetail() {
     if (!trimmed) {
       setRunForms((prev) => ({
         ...prev,
-        [regressionId]: { ...(prev[regressionId] ?? { show: true, targetUrl: "", loading: false, error: null, result: null }), error: "Target Base URL is required", loading: false },
+        [regressionId]: {
+          ...(prev[regressionId] ?? { show: true, targetUrl: "", loading: false, error: null, result: null }),
+          error: "Target Base URL is required",
+          loading: false,
+        },
       }));
       return;
     }
     setRunForms((prev) => ({
       ...prev,
-      [regressionId]: { ...(prev[regressionId] ?? { show: true, targetUrl: trimmed, loading: false, error: null, result: null }), loading: true, error: null, result: null },
+      [regressionId]: {
+        ...(prev[regressionId] ?? { show: true, targetUrl: trimmed, loading: false, error: null, result: null }),
+        loading: true,
+        error: null,
+        result: null,
+      },
     }));
     try {
       const res = await runRegression(trace.trace_id, regressionId, trimmed, { instanceId, apiBaseUrl });
       const passed = typeof res.passed === "boolean" ? res.passed : res.expected_status === res.actual_status;
       setRunForms((prev) => ({
         ...prev,
-        [regressionId]: { ...(prev[regressionId] ?? { show: true, targetUrl: trimmed, loading: false, error: null, result: null }), loading: false, result: { expected_status: res.expected_status, actual_status: res.actual_status, passed }, error: null },
+        [regressionId]: {
+          ...(prev[regressionId] ?? { show: true, targetUrl: trimmed, loading: false, error: null, result: null }),
+          loading: false,
+          result: { expected_status: res.expected_status, actual_status: res.actual_status, passed },
+          error: null,
+        },
       }));
     } catch (err) {
       setRunForms((prev) => ({
         ...prev,
-        [regressionId]: { ...(prev[regressionId] ?? { show: true, targetUrl: trimmed, loading: false, error: null, result: null }), loading: false, error: err instanceof Error ? err.message : String(err) },
+        [regressionId]: {
+          ...(prev[regressionId] ?? { show: true, targetUrl: trimmed, loading: false, error: null, result: null }),
+          loading: false,
+          error: err instanceof Error ? err.message : String(err),
+        },
       }));
     }
   };
@@ -320,16 +391,7 @@ export function TraceDetail() {
           description="We couldn’t retrieve this trace from the collector."
           detail={errorTrace}
           action={
-            <button
-              onClick={() => window.location.reload()}
-              className="px-3.5 py-1.5 rounded-[5px] text-[13px] font-semibold"
-              style={{
-                background: "var(--red-bg)",
-                border: "1px solid var(--red-border)",
-                color: "var(--red)",
-                cursor: "pointer",
-              }}
-            >
+            <button onClick={() => window.location.reload()} className="btn-destructive">
               Retry
             </button>
           }
@@ -342,9 +404,9 @@ export function TraceDetail() {
     return (
       <div>
         <Breadcrumbs items={[{ label: "Traces", to: "/" }, { label: decodedId.slice(0, 12) + "…" }]} />
-        <Panel>
+        <div className="ts-card">
           <EmptyState title="Trace not found" description="This trace ID doesn’t exist or has expired." />
-        </Panel>
+        </div>
       </div>
     );
   }
@@ -353,324 +415,191 @@ export function TraceDetail() {
     <div className="space-y-4">
       <Breadcrumbs items={[{ label: "Traces", to: "/" }, { label: trace.trace_id.slice(0, 12) + "…" }]} />
 
-      {/* Header panel — request summary (read-only) */}
-      <Panel>
-        <div className="p-4">
+      {/* ── Request summary ── */}
+      <Section
+        title="Request Summary"
+        subtitle="Read-only capture of the recorded HTTP call"
+        index={0}
+        actions={
+          <button
+            onClick={() => {
+              setShowReplayForm((v) => !v);
+              setReplayError(null);
+            }}
+            disabled={replayLoading}
+            className="btn-primary"
+          >
+            {replayLoading ? "Replaying..." : "▶ Replay"}
+          </button>
+        }
+      >
+        <div className="ts-card-body">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2.5 flex-wrap">
-                <span
-                  className="inline-flex px-2 py-0.5 rounded-[4px] text-[11px] font-bold tracking-[0.04em]"
-                  style={{
-                    background: "var(--accent-light)",
-                    color: "var(--accent-text)",
-                    border: "1px solid var(--border)",
-                  }}
-                >
+                <span className="inline-flex px-2 py-0.5 rounded-[5px] text-[11px] font-bold tracking-[0.04em]" style={{ background: "var(--accent-light)", color: "var(--accent-text)", border: "1px solid var(--border-accent)" }}>
                   {trace.method.toUpperCase()}
                 </span>
-                <span className="font-mono text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                <span className="ts-mono text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
                   {trace.path}
                 </span>
                 <StatusBadge code={trace.status_code} />
               </div>
 
               <div className="mt-2.5 flex items-center gap-2">
-                <span className="text-[11px] font-semibold tracking-[0.06em] uppercase" style={{ color: "var(--text-dim)" }}>
-                  Trace ID
-                </span>
-                <code
-                  className="text-[12px] font-mono px-2 py-0.5 rounded-[4px] break-all"
-                  style={{
-                    background: "var(--bg-surface-2)",
-                    border: "1px solid var(--border-dim)",
-                    color: "var(--accent-text)",
-                  }}
-                >
-                  {trace.trace_id}
-                </code>
+                <span className="ts-overline">Trace ID</span>
+                <code className="ts-code break-all">{trace.trace_id}</code>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-2 text-[12px]">
-                <span
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px]"
-                  style={{
-                    background: "var(--bg-surface-2)",
-                    border: "1px solid var(--border-dim)",
-                  }}
-                >
-                  <span style={{ color: "var(--text-dim)" }}>Duration</span>
-                  <span className="font-mono font-semibold" style={{ color: "var(--text-primary)" }}>
-                    {trace.duration_ms} ms
-                  </span>
-                </span>
-                <span
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px]"
-                  style={{
-                    background: "var(--bg-surface-2)",
-                    border: "1px solid var(--border-dim)",
-                  }}
-                >
-                  <span style={{ color: "var(--text-dim)" }}>Environment</span>
-                  <span className="font-medium" style={{ color: "var(--text-primary)" }}>
-                    {trace.environment}
-                  </span>
-                </span>
-                <span
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px]"
-                  style={{
-                    background: "var(--bg-surface-2)",
-                    border: "1px solid var(--border-dim)",
-                  }}
-                >
-                  <span style={{ color: "var(--text-dim)" }}>Created</span>
-                  <span className="font-mono" style={{ color: "var(--text-primary)" }}>
-                    {new Date(trace.created_at > 1e12 ? trace.created_at : trace.created_at * 1000).toLocaleString()}
-                  </span>
-                </span>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <MetaPill label="Duration" value={<span className="ts-mono ts-numeric">{trace.duration_ms} ms</span>} />
+                <MetaPill label="Environment" value={trace.environment} />
+                <MetaPill label="Created" value={<span className="ts-mono ts-numeric">{absoluteTime(trace.created_at)}</span>} />
               </div>
             </div>
-
-            <button
-              onClick={() => {
-                setShowReplayForm((v) => !v);
-                setReplayError(null);
-              }}
-              disabled={replayLoading}
-              className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-[5px] text-[13px] font-semibold transition-colors disabled:opacity-60"
-              style={{
-                background: "var(--accent)",
-                color: "#ffffff",
-                border: "none",
-                cursor: replayLoading ? "wait" : "pointer",
-                boxShadow: "var(--shadow-sm)",
-              }}
-              onMouseEnter={(e) => {
-                if (!replayLoading) e.currentTarget.style.background = "var(--accent-hover)";
-              }}
-              onMouseLeave={(e) => {
-                if (!replayLoading) e.currentTarget.style.background = "var(--accent)";
-              }}
-            >
-              {replayLoading ? "Replaying..." : "▶ Replay"}
-            </button>
           </div>
 
           {showReplayForm && (
-            <form onSubmit={handleReplaySubmit} className="mt-3 flex flex-wrap gap-2 items-end">
-              <div className="flex-1 min-w-[220px]">
-                <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
-                  Target Base URL
-                </label>
+            <form onSubmit={handleReplaySubmit} className="mt-4 flex flex-wrap gap-2.5 items-end ts-pop">
+              <Field label="Target Base URL" className="flex-1 min-w-[220px]">
                 <input
                   value={targetBaseUrl}
                   onChange={(e) => setTargetBaseUrl(e.target.value)}
                   placeholder="http://localhost:6001"
-                  className="w-full px-3 font-mono text-[13px]"
-                  style={{
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border)",
-                    color: "var(--text-primary)",
-                    borderRadius: "6px",
-                    fontSize: "13px",
-                    height: "32px",
-                    outline: "none",
-                  }}
+                  className="ts-input ts-input-mono"
                 />
-              </div>
-              <button
-                type="submit"
-                disabled={replayLoading}
-                className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-[5px] text-[13px] font-semibold disabled:opacity-60"
-                style={{
-                  background: "var(--accent)",
-                  color: "#ffffff",
-                  border: "none",
-                  cursor: replayLoading ? "wait" : "pointer",
-                  height: "32px",
-                }}
-              >
+              </Field>
+              <button type="submit" disabled={replayLoading} className="btn-primary">
                 {replayLoading ? "Replaying..." : "Send Replay"}
               </button>
-              <button
-                type="button"
-                onClick={() => setShowReplayForm(false)}
-                className="shrink-0 px-3 py-2 rounded-[5px] text-[13px] font-medium"
-                style={{
-                  background: "var(--bg-surface-2)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-secondary)",
-                  cursor: "pointer",
-                  height: "32px",
-                }}
-              >
+              <button type="button" onClick={() => setShowReplayForm(false)} className="btn-secondary">
                 Cancel
               </button>
             </form>
           )}
 
           {replayError && (
-            <div className="mt-3 text-[12px]" style={{ color: "var(--red)" }}>
-              {replayError}
+            <div className="mt-3">
+              <InlineError>{replayError}</InlineError>
             </div>
           )}
 
           {replayResult && (
-            <div className="mt-3 flex gap-4 text-[12px] flex-wrap" style={{ color: "var(--text-primary)" }}>
-              <div>
-                <span style={{ color: "var(--text-dim)" }}>original</span> status_code: {replayResult.original.status_code} duration_ms: {replayResult.original.duration_ms}
+            <div className="mt-3 ts-pop grid grid-cols-1 sm:grid-cols-2 gap-2.5" aria-live="polite">
+              <div className="rounded-[9px] p-3" style={{ background: "var(--bg-surface-2)", border: "1px solid var(--border-dim)" }}>
+                <div className="ts-overline mb-1.5">Original</div>
+                <div className="ts-mono text-[12px] ts-numeric text-slate-300">
+                  status_code: <span className="text-white font-semibold">{replayResult.original.status_code}</span>
+                </div>
+                <div className="ts-mono text-[12px] ts-numeric text-slate-300">
+                  duration_ms: <span className="text-white font-semibold">{replayResult.original.duration_ms}</span>
+                </div>
               </div>
-              <div>
-                <span style={{ color: "var(--text-dim)" }}>replay</span> status_code: {replayResult.replay.status_code} duration_ms: {replayResult.replay.duration_ms}
+              <div className="rounded-[9px] p-3" style={{ background: "var(--accent-light)", border: "1px solid var(--border-accent)" }}>
+                <div className="ts-overline mb-1.5" style={{ color: "var(--accent-text)" }}>
+                  Replay
+                </div>
+                <div className="ts-mono text-[12px] ts-numeric text-slate-300">
+                  status_code: <span className="text-white font-semibold">{replayResult.replay.status_code}</span>
+                </div>
+                <div className="ts-mono text-[12px] ts-numeric text-slate-300">
+                  duration_ms: <span className="text-white font-semibold">{replayResult.replay.duration_ms}</span>
+                </div>
               </div>
             </div>
           )}
+        </div>
 
-          {/* Save as Regression Test - below Replay */}
-          <div className="mt-4" style={{ borderTop: "1px solid var(--border-dim)", paddingTop: "12px" }}>
+        {/* Save as Regression Test */}
+        <div className="ts-card-body ts-hairline-top">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={() => {
                 setShowRegressionForm((v) => !v);
                 setRegError(null);
               }}
               disabled={regSaving}
-              className="inline-flex items-center px-3 py-1.5 rounded-[5px] text-[13px] font-medium disabled:opacity-60"
-              style={{
-                background: "var(--bg-surface-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
-                cursor: regSaving ? "wait" : "pointer",
-              }}
+              className="btn-secondary"
             >
               Save as Regression Test
             </button>
-
-            {regSavedMsg && (
-              <div className="mt-2 text-[12px]" style={{ color: "green" }}>
-                {regSavedMsg}
-              </div>
-            )}
-
-            {showRegressionForm && (
-              <form onSubmit={handleRegressionSave} className="mt-3 flex flex-wrap gap-2 items-end">
-                <div className="flex-1 min-w-[180px]">
-                  <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
-                    Test Name
-                  </label>
-                  <input
-                    value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
-                    placeholder="My regression test"
-                    className="w-full px-3 text-[13px]"
-                    style={{
-                      background: "var(--bg-surface)",
-                      border: "1px solid var(--border)",
-                      color: "var(--text-primary)",
-                      borderRadius: "6px",
-                      height: "32px",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-                <div className="w-[160px]">
-                  <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
-                    Expected Status Code
-                  </label>
-                  <input
-                    type="number"
-                    value={regExpected}
-                    onChange={(e) => setRegExpected(Number(e.target.value))}
-                    placeholder="200"
-                    className="w-full px-3 font-mono text-[13px]"
-                    style={{
-                      background: "var(--bg-surface)",
-                      border: "1px solid var(--border)",
-                      color: "var(--text-primary)",
-                      borderRadius: "6px",
-                      height: "32px",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={regSaving}
-                  className="shrink-0 inline-flex items-center px-4 py-2 rounded-[5px] text-[13px] font-semibold disabled:opacity-60"
-                  style={{
-                    background: "var(--accent)",
-                    color: "#ffffff",
-                    border: "none",
-                    cursor: regSaving ? "wait" : "pointer",
-                    height: "32px",
-                  }}
-                >
-                  {regSaving ? "Saving..." : "Save"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowRegressionForm(false)}
-                  className="shrink-0 px-3 py-2 rounded-[5px] text-[13px] font-medium"
-                  style={{
-                    background: "var(--bg-surface-2)",
-                    border: "1px solid var(--border)",
-                    color: "var(--text-secondary)",
-                    cursor: "pointer",
-                    height: "32px",
-                  }}
-                >
-                  Cancel
-                </button>
-              </form>
-            )}
-
-            {regError && (
-              <div className="mt-2 text-[12px]" style={{ color: "var(--red)" }}>
-                {regError}
-              </div>
-            )}
-          </div>
-        </div>
-      </Panel>
-
-      {/* Regression Tests list */}
-      <Panel>
-        <div className="p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
-              Regression Tests
-            </span>
             <span className="text-[11px]" style={{ color: "var(--text-dim)" }}>
-              {regressions.length} test{regressions.length !== 1 ? "s" : ""}
+              Locks this request&apos;s expected status so the bug can&apos;t silently return.
             </span>
           </div>
 
-          {loadingRegressions ? (
-            <div className="mt-3 text-[13px]" style={{ color: "var(--text-dim)" }}>
-              Loading...
+          {regSavedMsg && (
+            <div className="mt-3 ts-pop">
+              <InlineSuccess>{regSavedMsg}</InlineSuccess>
             </div>
-          ) : regListError ? (
-            <div className="mt-3 text-[12px]" style={{ color: "var(--red)" }}>
-              {regListError}
+          )}
+
+          {showRegressionForm && (
+            <form onSubmit={handleRegressionSave} className="mt-3 flex flex-wrap gap-2.5 items-end ts-pop">
+              <Field label="Test Name" className="flex-1 min-w-[180px]">
+                <input value={regName} onChange={(e) => setRegName(e.target.value)} placeholder="My regression test" className="ts-input" />
+              </Field>
+              <Field label="Expected Status Code" className="w-[170px]">
+                <input
+                  type="number"
+                  value={regExpected}
+                  onChange={(e) => setRegExpected(Number(e.target.value))}
+                  placeholder="200"
+                  className="ts-input ts-input-mono ts-numeric"
+                />
+              </Field>
+              <button type="submit" disabled={regSaving} className="btn-primary">
+                {regSaving ? "Saving..." : "Save"}
+              </button>
+              <button type="button" onClick={() => setShowRegressionForm(false)} className="btn-secondary">
+                Cancel
+              </button>
+            </form>
+          )}
+
+          {regError && (
+            <div className="mt-3">
+              <InlineError>{regError}</InlineError>
             </div>
-          ) : regressions.length === 0 ? (
-            <div className="mt-3 text-[13px]" style={{ color: "var(--text-dim)" }}>
-              No regression tests yet.
-            </div>
-          ) : (
-            <div className="mt-3 space-y-2">
-              {regressions.map((r) => {
-                const rowState = runForms[r.id] ?? { show: false, targetUrl: "", loading: false, error: null, result: null };
-                return (
-                  <div key={r.id} className="flex flex-wrap items-center gap-2 py-2" style={{ borderBottom: "1px solid var(--border-dim)" }}>
-                    <span className="text-[13px] font-medium" style={{ color: "var(--text-primary)" }}>
-                      {r.name}
+          )}
+        </div>
+      </Section>
+
+      {/* ── Regression tests ── */}
+      <Section
+        title="Regression Tests"
+        subtitle="Saved checks that assert this request keeps its expected status"
+        index={1}
+        actions={<Badge tone="neutral">{regressions.length} test{regressions.length !== 1 ? "s" : ""}</Badge>}
+      >
+        {loadingRegressions ? (
+          <div className="ts-card-body">
+            <div className="h-[18px] w-[120px] rounded skeleton-shimmer" />
+            <div className="mt-3 h-[40px] rounded skeleton-shimmer" />
+          </div>
+        ) : regListError ? (
+          <div className="ts-card-body">
+            <InlineError>{regListError}</InlineError>
+          </div>
+        ) : regressions.length === 0 ? (
+          <EmptyState title="No regression tests yet" description="Use “Save as Regression Test” above to lock this request’s behaviour." />
+        ) : (
+          <div>
+            {regressions.map((r, i) => {
+              const rowState = runForms[r.id] ?? { show: false, targetUrl: "", loading: false, error: null, result: null };
+              return (
+                <div
+                  key={r.id}
+                  className="ts-stagger px-4 py-3"
+                  style={{ ["--stagger-i" as string]: Math.min(i, 8), borderBottom: "1px solid var(--border-dim)" }}
+                >
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="text-[13px] font-medium text-white">{r.name}</span>
+                    <StatusBadge code={r.expected_status} showDot={false} />
+                    <span className="text-[11px] ts-mono ts-numeric" style={{ color: "var(--text-dim)" }}>
+                      {absoluteTime(r.created_at)}
                     </span>
-                    <span className="text-[12px]" style={{ color: "var(--text-dim)" }}>
-                      Expected Status: {r.expected_status}
-                    </span>
-                    <span className="text-[12px] font-mono" style={{ color: "var(--text-dim)" }}>
-                      {new Date(r.created_at > 1e12 ? r.created_at : r.created_at * 1000).toLocaleString()}
-                    </span>
+
                     <button
                       onClick={() =>
                         setRunForms((prev) => ({
@@ -678,153 +607,97 @@ export function TraceDetail() {
                           [r.id]: { ...(prev[r.id] ?? { show: false, targetUrl: "", loading: false, error: null, result: null }), show: !prev[r.id]?.show, error: null },
                         }))
                       }
-                      className="ml-2 px-2.5 py-1 rounded-[4px] text-[12px] font-medium"
-                      style={{
-                        background: "var(--bg-surface-2)",
-                        border: "1px solid var(--border)",
-                        color: "var(--text-primary)",
-                        cursor: "pointer",
-                      }}
+                      className="btn-secondary !py-1 !px-2.5 !text-[11px] ml-auto"
                     >
                       Run
                     </button>
 
                     {rowState.result && (
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="inline-flex px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold"
-                          style={{
-                            background: rowState.result.passed ? "#dcfce7" : "#fee2e2",
-                            color: rowState.result.passed ? "#166534" : "#991b1b",
-                            border: `1px solid ${rowState.result.passed ? "#86efac" : "#fecaca"}`,
-                          }}
-                        >
-                          {rowState.result.passed ? "PASS" : "FAIL"}
-                        </span>
-                        <span className="text-[11px]" style={{ color: "gray" }}>
+                      <div className="inline-flex items-center gap-2 ts-pop">
+                        <ResultBadge status={rowState.result.passed ? "success" : "fail"} label={rowState.result.passed ? "PASS" : "FAIL"} />
+                        <span className="text-[11px] text-slate-400 ts-mono ts-numeric">
                           expected: {rowState.result.expected_status}, actual: {rowState.result.actual_status}
                         </span>
-                      </span>
-                    )}
-
-                    {rowState.error && (
-                      <span className="text-[11px]" style={{ color: "var(--red)" }}>
-                        {rowState.error}
-                      </span>
-                    )}
-
-                    {rowState.show && (
-                      <form
-                        onSubmit={(e) => handleRunSubmit(e, r.id)}
-                        className="w-full flex flex-wrap gap-2 items-end mt-1"
-                      >
-                        <div className="flex-1 min-w-[200px]">
-                          <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
-                            Target Base URL
-                          </label>
-                          <input
-                            value={rowState.targetUrl}
-                            onChange={(e) =>
-                              setRunForms((prev) => ({
-                                ...prev,
-                                [r.id]: { ...(prev[r.id] ?? { show: true, targetUrl: "", loading: false, error: null, result: null }), targetUrl: e.target.value },
-                              }))
-                            }
-                            placeholder="http://localhost:6001"
-                            className="w-full px-3 font-mono text-[13px]"
-                            style={{
-                              background: "var(--bg-surface)",
-                              border: "1px solid var(--border)",
-                              color: "var(--text-primary)",
-                              borderRadius: "6px",
-                              height: "32px",
-                              outline: "none",
-                            }}
-                          />
-                        </div>
-                        <button
-                          type="submit"
-                          disabled={rowState.loading}
-                          className="shrink-0 px-3 py-1.5 rounded-[5px] text-[13px] font-semibold disabled:opacity-60"
-                          style={{
-                            background: "var(--accent)",
-                            color: "#ffffff",
-                            border: "none",
-                            cursor: rowState.loading ? "wait" : "pointer",
-                            height: "32px",
-                          }}
-                        >
-                          {rowState.loading ? "Running..." : "Send"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setRunForms((prev) => ({
-                              ...prev,
-                              [r.id]: { ...(prev[r.id] ?? { show: true, targetUrl: "", loading: false, error: null, result: null }), show: false },
-                            }))
-                          }
-                          className="shrink-0 px-3 py-1.5 rounded-[5px] text-[13px] font-medium"
-                          style={{
-                            background: "var(--bg-surface-2)",
-                            border: "1px solid var(--border)",
-                            color: "var(--text-secondary)",
-                            cursor: "pointer",
-                            height: "32px",
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </form>
+                      </div>
                     )}
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </Panel>
 
-      {/* Timeline */}
-      {loadingEvents ? (
-        <Panel>
-          <div className="p-4 space-y-3">
-            <div className="h-[18px] rounded w-[160px] skeleton-shimmer" />
-            <div className="h-[120px] rounded skeleton-shimmer" />
+                  {rowState.error && (
+                    <div className="mt-2">
+                      <InlineError>{rowState.error}</InlineError>
+                    </div>
+                  )}
+
+                  {rowState.show && (
+                    <form onSubmit={(e) => handleRunSubmit(e, r.id)} className="mt-2.5 flex flex-wrap gap-2.5 items-end ts-pop">
+                      <Field label="Target Base URL" className="flex-1 min-w-[200px]">
+                        <input
+                          value={rowState.targetUrl}
+                          onChange={(e) =>
+                            setRunForms((prev) => ({
+                              ...prev,
+                              [r.id]: { ...(prev[r.id] ?? { show: true, targetUrl: "", loading: false, error: null, result: null }), targetUrl: e.target.value },
+                            }))
+                          }
+                          placeholder="http://localhost:6001"
+                          className="ts-input ts-input-mono"
+                        />
+                      </Field>
+                      <button type="submit" disabled={rowState.loading} className="btn-primary">
+                        {rowState.loading ? "Running..." : "Send"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRunForms((prev) => ({
+                            ...prev,
+                            [r.id]: { ...(prev[r.id] ?? { show: true, targetUrl: "", loading: false, error: null, result: null }), show: false },
+                          }))
+                        }
+                        className="btn-secondary"
+                      >
+                        Cancel
+                      </button>
+                    </form>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </Panel>
+        )}
+      </Section>
+
+      {/* ── Timeline ── */}
+      {loadingEvents ? (
+        <div className="ts-card p-4 space-y-3">
+          <div className="h-[18px] rounded w-[160px] skeleton-shimmer" />
+          <div className="h-[120px] rounded skeleton-shimmer" />
+        </div>
       ) : errorEvents ? (
         <ErrorState title="Unable to load timeline" description="We couldn’t load events for this trace." detail={errorEvents} />
       ) : (
         <Timeline events={events} />
       )}
 
-      {/* Events table */}
-      <Panel hoverShadow={false} className="overflow-hidden">
-        <div
-          className="px-3.5 py-2.5 flex items-center justify-between"
-          style={{ borderBottom: "1px solid var(--border-dim)" }}
-        >
-          <span className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
-            Events
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px]" style={{ color: "var(--text-dim)" }}>
+      {/* ── Events table ── */}
+      <div className="ts-card ts-stagger" style={{ ["--stagger-i" as string]: 3 }}>
+        <div className="ts-card-header">
+          <div>
+            <div className="ts-card-title">Events</div>
+            <div className="ts-card-subtitle">Raw spans attached to this trace</div>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <Badge tone="neutral">
               {events.length} event{events.length !== 1 ? "s" : ""}
-            </span>
+            </Badge>
             <button
               onClick={() => {
                 setShowAddEventForm((v) => !v);
                 setAddEventError(null);
                 setAddEventValidation(null);
               }}
-              className="px-2.5 py-1 rounded-[4px] text-[12px] font-medium"
-              style={{
-                background: "var(--bg-surface-2)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
-                cursor: "pointer",
-              }}
+              className="btn-secondary !py-1 !px-2.5"
+              aria-expanded={showAddEventForm}
             >
               + Add Event
             </button>
@@ -832,129 +705,34 @@ export function TraceDetail() {
         </div>
 
         {showAddEventForm && (
-          <form onSubmit={handleAddEventSubmit} className="px-3.5 py-3 flex flex-col gap-2" style={{ borderBottom: "1px solid var(--border-dim)", background: "var(--bg-surface)" }}>
-            <div className="flex flex-wrap gap-2">
-              <div className="flex-1 min-w-[160px]">
-                <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
-                  Event Type
-                </label>
-                <input
-                  value={addEventType}
-                  onChange={(e) => setAddEventType(e.target.value)}
-                  placeholder="e.g. db_query, external_api"
-                  className="w-full px-3 text-[13px]"
-                  style={{
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border)",
-                    color: "var(--text-primary)",
-                    borderRadius: "6px",
-                    height: "32px",
-                    outline: "none",
-                  }}
-                />
-              </div>
-              <div className="flex-1 min-w-[160px]">
-                <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
-                  Service
-                </label>
-                <input
-                  value={addEventService}
-                  onChange={(e) => setAddEventService(e.target.value)}
-                  placeholder="e.g. MongoDB, Payment API"
-                  className="w-full px-3 text-[13px]"
-                  style={{
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border)",
-                    color: "var(--text-primary)",
-                    borderRadius: "6px",
-                    height: "32px",
-                    outline: "none",
-                  }}
-                />
-              </div>
-              <div className="flex-1 min-w-[160px]">
-                <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
-                  Operation
-                </label>
-                <input
-                  value={addEventOperation}
-                  onChange={(e) => setAddEventOperation(e.target.value)}
-                  placeholder="e.g. findOne, processPayment"
-                  className="w-full px-3 text-[13px]"
-                  style={{
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border)",
-                    color: "var(--text-primary)",
-                    borderRadius: "6px",
-                    height: "32px",
-                    outline: "none",
-                  }}
-                />
-              </div>
-              <div className="w-[140px]">
-                <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
-                  Duration (ms)
-                </label>
-                <input
-                  type="number"
-                  value={addEventDuration}
-                  onChange={(e) => setAddEventDuration(e.target.value)}
-                  placeholder="e.g. 120"
-                  className="w-full px-3 font-mono text-[13px]"
-                  style={{
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border)",
-                    color: "var(--text-primary)",
-                    borderRadius: "6px",
-                    height: "32px",
-                    outline: "none",
-                  }}
-                />
-              </div>
+          <form onSubmit={handleAddEventSubmit} className="px-4 py-3.5 flex flex-col gap-2.5 ts-pop" style={{ background: "var(--bg-surface-2)", borderBottom: "1px solid var(--border)" }}>
+            <div className="flex flex-wrap gap-2.5">
+              <Field label="Event Type" className="flex-1 min-w-[160px]">
+                <input value={addEventType} onChange={(e) => setAddEventType(e.target.value)} placeholder="e.g. db_query, external_api" className="ts-input" />
+              </Field>
+              <Field label="Service" className="flex-1 min-w-[160px]">
+                <input value={addEventService} onChange={(e) => setAddEventService(e.target.value)} placeholder="e.g. MongoDB, Payment API" className="ts-input" />
+              </Field>
+              <Field label="Operation" className="flex-1 min-w-[160px]">
+                <input value={addEventOperation} onChange={(e) => setAddEventOperation(e.target.value)} placeholder="e.g. findOne, processPayment" className="ts-input" />
+              </Field>
+              <Field label="Duration (ms)" className="w-[140px]">
+                <input type="number" value={addEventDuration} onChange={(e) => setAddEventDuration(e.target.value)} placeholder="e.g. 120" className="ts-input ts-input-mono ts-numeric" />
+              </Field>
             </div>
-            <div>
-              <label className="text-[11px] font-semibold tracking-[0.06em] uppercase block mb-1" style={{ color: "var(--text-dim)" }}>
-                Metadata
-              </label>
+            <Field label="Metadata">
               <textarea
                 value={addEventMetadata}
                 onChange={(e) => setAddEventMetadata(e.target.value)}
                 placeholder='JSON string, e.g. {"key":"value"}'
                 rows={2}
-                className="w-full px-3 py-2 font-mono text-[13px]"
-                style={{
-                  background: "var(--bg-surface)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-primary)",
-                  borderRadius: "6px",
-                  outline: "none",
-                  resize: "vertical",
-                }}
+                className="ts-textarea ts-input-mono"
               />
-            </div>
-            {addEventValidation && (
-              <div className="text-[12px]" style={{ color: "var(--red)" }}>
-                {addEventValidation}
-              </div>
-            )}
-            {addEventError && (
-              <div className="text-[12px]" style={{ color: "var(--red)" }}>
-                {addEventError}
-              </div>
-            )}
+            </Field>
+            {addEventValidation && <InlineError>{addEventValidation}</InlineError>}
+            {addEventError && <InlineError>{addEventError}</InlineError>}
             <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={addEventSaving}
-                className="px-4 py-1.5 rounded-[5px] text-[13px] font-semibold disabled:opacity-60"
-                style={{
-                  background: "var(--accent)",
-                  color: "#ffffff",
-                  border: "none",
-                  cursor: addEventSaving ? "wait" : "pointer",
-                  height: "32px",
-                }}
-              >
+              <button type="submit" disabled={addEventSaving} className="btn-primary">
                 {addEventSaving ? "Saving..." : "Add Event"}
               </button>
               <button
@@ -964,14 +742,7 @@ export function TraceDetail() {
                   setAddEventError(null);
                   setAddEventValidation(null);
                 }}
-                className="px-3 py-1.5 rounded-[5px] text-[13px] font-medium"
-                style={{
-                  background: "var(--bg-surface-2)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-secondary)",
-                  cursor: "pointer",
-                  height: "32px",
-                }}
+                className="btn-secondary"
               >
                 Cancel
               </button>
@@ -980,64 +751,35 @@ export function TraceDetail() {
         )}
 
         {loadingEvents ? (
-          <div className="p-4 text-[13px]" style={{ color: "var(--text-dim)" }}>
-            Loading events…
-          </div>
+          <div className="p-4 text-[13px] text-slate-400">Loading events…</div>
         ) : events.length === 0 ? (
-          <div className="p-0">
-            <EmptyState title="No events" description="No events were recorded for this trace." />
-          </div>
+          <EmptyState title="No events" description="No events were recorded for this trace." />
         ) : (
-          <div className="overflow-auto">
-            <table className="w-full text-[13px] border-collapse">
+          <TableWrap>
+            <table className="ts-table">
               <thead>
-                <tr
-                  className="text-left text-[10px] font-bold tracking-[0.08em] uppercase"
-                  style={{
-                    background: "var(--bg-surface-2)",
-                    borderBottom: "1px solid var(--border)",
-                    color: "var(--text-dim)",
-                  }}
-                >
-                  <th className="px-3 py-2">Service</th>
-                  <th className="px-3 py-2">Operation</th>
-                  <th className="px-3 py-2">Duration</th>
-                  <th className="px-3 py-2">Event Type</th>
+                <tr>
+                  <th scope="col">Service</th>
+                  <th scope="col">Operation</th>
+                  <th scope="col">Duration</th>
+                  <th scope="col">Event Type</th>
                 </tr>
               </thead>
               <tbody>
                 {[...events]
                   .sort((a, b) => a.created_at - b.created_at)
-                  .map((ev, idx) => (
-                    <tr
-                      key={ev.id}
-                      className="transition-colors"
-                      style={{
-                        borderBottom: idx < events.length - 1 ? "1px solid var(--border-dim)" : "none",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "var(--bg-surface-2)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "transparent";
-                      }}
-                    >
-                      <td className="px-3 py-[9px] font-mono text-[12px]" style={{ color: "var(--text-primary)" }}>
-                        {ev.service}
-                      </td>
-                      <td className="px-3 py-[9px]" style={{ color: "var(--text-secondary)" }}>
-                        {ev.operation}
-                      </td>
-                      <td className="px-3 py-[9px] font-mono text-[12px]" style={{ color: "var(--text-primary)" }}>
-                        {ev.duration_ms} ms
-                      </td>
-                      <td className="px-3 py-[9px]">
+                  .map((ev, i) => (
+                    <tr key={ev.id} className="ts-stagger" style={{ ["--stagger-i" as string]: Math.min(i, 10) }}>
+                      <td className="ts-mono text-[12px] text-white">{ev.service}</td>
+                      <td className="text-slate-300">{ev.operation}</td>
+                      <td className="ts-mono text-[12px] ts-numeric text-slate-200">{ev.duration_ms} ms</td>
+                      <td>
                         <span
-                          className="inline-flex px-1.5 py-0.5 rounded-[3px] text-[11px] font-medium"
+                          className="inline-flex px-2 py-0.5 rounded-[5px] text-[10px] font-semibold font-mono uppercase"
                           style={{
+                            color: EVENT_TYPE_TONE[ev.event_type.toLowerCase()] ?? "var(--text-secondary)",
                             background: "var(--bg-surface-2)",
-                            border: "1px solid var(--border-dim)",
-                            color: "var(--text-secondary)",
+                            border: "1px solid var(--border)",
                           }}
                         >
                           {ev.event_type}
@@ -1047,9 +789,9 @@ export function TraceDetail() {
                   ))}
               </tbody>
             </table>
-          </div>
+          </TableWrap>
         )}
-      </Panel>
+      </div>
     </div>
   );
 }

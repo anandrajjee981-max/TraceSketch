@@ -8,6 +8,7 @@ import { ReplaysList } from "./pages/ReplaysList";
 import { RegressionsList } from "./pages/RegressionsList";
 import { Settings } from "./pages/Settings";
 import { WebsiteLanding } from "./pages/WebsiteLanding";
+import { Relay } from "./pages/Relay";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
               <Route path="/" element={<TracesList />} />
               <Route path="/replays" element={<ReplaysList />} />
               <Route path="/regressions" element={<RegressionsList />} />
+              <Route path="/relay" element={<Relay />} />
               <Route path="/traces/:traceId" element={<TraceDetail />} />
               <Route path="/settings" element={<Settings />} />
             </Route>

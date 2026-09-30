@@ -3,56 +3,79 @@ interface Props {
   showDot?: boolean;
 }
 
-export function StatusBadge({ code, showDot = true }: Props) {
-  let color: string;
-  let bg: string;
-  let border: string;
-  let dotColor: string;
+type Tone = { color: string; bg: string; border: string; dot: string };
 
+const statusTone = (code: number): Tone => {
   if (code >= 200 && code < 300) {
-    color = "var(--green)";
-    bg = "var(--green-bg)";
-    border = "var(--green-border)";
-    dotColor = "#10B981";
-  } else if (code >= 300 && code < 400) {
-    color = "var(--blue)";
-    bg = "var(--blue-bg)";
-    border = "var(--blue-border)";
-    dotColor = "#38BDF8";
-  } else if (code >= 400 && code < 500) {
-    color = "var(--amber)";
-    bg = "var(--amber-bg)";
-    border = "var(--amber-border)";
-    dotColor = "#F59E0B";
-  } else if (code >= 500) {
-    color = "var(--red)";
-    bg = "var(--red-bg)";
-    border = "var(--red-border)";
-    dotColor = "#F43F5E";
-  } else {
-    color = "var(--text-dim)";
-    bg = "var(--bg-surface-2)";
-    border = "var(--border)";
-    dotColor = "var(--text-dim)";
+    return { color: "var(--green)", bg: "var(--green-bg)", border: "var(--green-border)", dot: "#10B981" };
   }
+  if (code >= 300 && code < 400) {
+    return { color: "var(--blue)", bg: "var(--blue-bg)", border: "var(--blue-border)", dot: "#38BDF8" };
+  }
+  if (code >= 400 && code < 500) {
+    return { color: "var(--amber)", bg: "var(--amber-bg)", border: "var(--amber-border)", dot: "#F59E0B" };
+  }
+  if (code >= 500) {
+    return { color: "var(--red)", bg: "var(--red-bg)", border: "var(--red-border)", dot: "#F43F5E" };
+  }
+  return { color: "var(--text-dim)", bg: "var(--bg-surface-2)", border: "var(--border)", dot: "var(--text-dim)" };
+};
+
+export function StatusBadge({ code, showDot = true }: Props) {
+  const tone = statusTone(code);
 
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-[8px] py-[3px] rounded-full text-[11px] font-semibold font-mono leading-none tracking-[0.03em] transition-all duration-150 hover:scale-[1.04]"
-      style={{
-        color,
-        background: bg,
-        border: `1px solid ${border}`,
-        boxShadow: `0 0 10px ${bg}`,
-      }}
+      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold font-mono leading-none tracking-[0.02em] select-none ts-numeric"
+      style={{ color: tone.color, background: tone.bg, border: `1px solid ${tone.border}` }}
     >
       {showDot && (
         <span
           className="w-[5px] h-[5px] rounded-full shrink-0"
-          style={{ background: dotColor, boxShadow: `0 0 6px ${dotColor}` }}
+          style={{ background: tone.dot, boxShadow: `0 0 6px ${tone.dot}` }}
         />
       )}
       {code}
+    </span>
+  );
+}
+
+const resultTone = (status: "success" | "fail" | "warning" | "neutral"): Tone => {
+  if (status === "success") {
+    return { color: "var(--green)", bg: "var(--green-bg)", border: "var(--green-border)", dot: "#10B981" };
+  }
+  if (status === "fail") {
+    return { color: "var(--red)", bg: "var(--red-bg)", border: "var(--red-border)", dot: "#F43F5E" };
+  }
+  if (status === "warning") {
+    return { color: "var(--amber)", bg: "var(--amber-bg)", border: "var(--amber-border)", dot: "#F59E0B" };
+  }
+  return { color: "var(--text-secondary)", bg: "var(--bg-surface-2)", border: "var(--border)", dot: "var(--text-dim)" };
+};
+
+export function ResultBadge({
+  status,
+  label,
+  showDot = true,
+}: {
+  status: "success" | "fail" | "warning" | "neutral";
+  label: string;
+  showDot?: boolean;
+}) {
+  const tone = resultTone(status);
+
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold font-mono leading-none uppercase tracking-[0.04em] select-none"
+      style={{ color: tone.color, background: tone.bg, border: `1px solid ${tone.border}` }}
+    >
+      {showDot && (
+        <span
+          className="w-[5px] h-[5px] rounded-full shrink-0"
+          style={{ background: tone.dot, boxShadow: `0 0 6px ${tone.dot}` }}
+        />
+      )}
+      {label}
     </span>
   );
 }

@@ -1,6 +1,44 @@
 import { Request, Response } from "express";
-import { createGroup, joinGroup, isInstanceInActiveSession } from "../dao/group.dao";
-import server from "server";
+import { createGroup, joinGroup, isInstanceInActiveSession, leaveGroup, getGroupByInstanceId } from "../dao/group.dao.js";
+
+export async function getSessionController(req: Request, res: Response) {
+  try {
+    const { instanceId } = req.params as { instanceId: string };
+    if (!instanceId) return res.status(400).json({ message: "instanceId is required" });
+
+    const session = await getGroupByInstanceId(instanceId);
+    if (!session) return res.status(404).json({ message: "No active session" });
+
+    return res.status(200).json({ groupCode: session.groupCode });
+  } catch (err) {
+    console.error("getSessionController error:", err);
+    return res.status(500).json({ message: "internal server error" });
+  }
+}
+
+export async function leaveGroupController(req: Request, res: Response) {
+  try {
+    const groupCode = req.params.code as string;
+    const { instanceId } = req.body;
+
+    if (!instanceId) {
+      return res.status(400).json({ message: "instanceId is required" });
+    }
+
+    const left = await leaveGroup(groupCode, instanceId);
+    if (!left) {
+      return res.status(404).json({ message: "group not found or instance is not a member" });
+    }
+
+    const io = req.app.get("io");
+    io?.to(groupCode).emit("peer-left", { instanceId });
+
+    return res.status(200).json({ message: "Left group" });
+  } catch (err) {
+    console.error("leaveGroupController error:", err);
+    return res.status(500).json({ message: "internal server error" });
+  }
+}
 
 export async function createGroupController(req: Request, res: Response) {
   try {
@@ -12,15 +50,17 @@ export async function createGroupController(req: Request, res: Response) {
 
     const alreadyActive = await isInstanceInActiveSession(creatorInstanceId);
     if (alreadyActive) {
-      return res.status(409).json({ message: "You already have an active session. Leave it before creating a new one." });
+      return res
+        .status(409)
+        .json({ message: "You already have an active session. Leave it before creating a new one." });
     }
 
-    const groupCode = await createGroup(creatorInstanceId); 
+    const groupCode = await createGroup(creatorInstanceId);
 
-    res.status(201).json({ message: "Group created", groupCode });
+    return res.status(201).json({ message: "Group created", groupCode });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "internal server error" });
+    console.error("createGroupController error:", err);
+    return res.status(500).json({ message: "internal server error" });
   }
 }
 
@@ -30,26 +70,26 @@ export async function joinGroupController(req: Request, res: Response) {
 
     // 1. Validation
     if (!groupCode || !joinerInstanceId) {
-      return res.status(400).json({ 
-        message: "groupCode and joinerInstanceId are required" 
-      });
+      return res
+        .status(400)
+        .json({ message: "groupCode and joinerInstanceId are required" });
     }
 
     // 2. Check active session
     const alreadyActive = await isInstanceInActiveSession(joinerInstanceId);
     if (alreadyActive) {
-      return res.status(409).json({ 
-        message: "You already have an active session. Leave it before joining another." 
-      });
+      return res
+        .status(409)
+        .json({ message: "You already have an active session. Leave it before joining another." });
     }
 
-    // 3. Database operation
+    // 3. Database operation (atomic claim of the joiner seat)
     const result = await joinGroup(groupCode, joinerInstanceId);
     if (!result.success) {
       return res.status(400).json({ message: result.message });
     }
 
-    // 4. (Optional) Broadcast socket event to room to notify connected clients
+    // 4. Broadcast so the creator's socket learns a peer is ready.
     const io = req.app.get("io");
     if (io) {
       io.to(groupCode).emit("user-joined", { joinerInstanceId });
@@ -57,7 +97,6 @@ export async function joinGroupController(req: Request, res: Response) {
 
     // 5. Send HTTP Response
     return res.status(200).json({ message: result.message, groupCode });
-
   } catch (err) {
     console.error("joinGroupController error:", err);
     return res.status(500).json({ message: "Internal server error" });

@@ -10,10 +10,20 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  // Reset the query when the palette transitions closed -> open. Adjusting
+  // state during render is React's recommended alternative to an effect that
+  // only calls setState.
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
     if (isOpen) {
       setQuery("");
       setSelectedIndex(0);
+    }
+  }
+
+  useEffect(() => {
+    if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
@@ -193,15 +203,18 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] px-4 animate-fade"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] px-4 ts-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command palette"
       style={{
-        backgroundColor: "rgba(5, 7, 12, 0.75)",
+        backgroundColor: "rgba(5, 7, 12, 0.72)",
         backdropFilter: "blur(8px)",
       }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[620px] rounded-[14px] overflow-hidden flex flex-col shadow-2xl transition-all duration-200"
+        className="w-full max-w-[620px] rounded-[14px] overflow-hidden flex flex-col ts-dialog"
         style={{
           background: "#111422",
           border: "1px solid rgba(108, 71, 255, 0.35)",
@@ -215,7 +228,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
           className="flex items-center gap-3 px-4 py-3.5"
           style={{ borderBottom: "1px solid var(--border)" }}
         >
-          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" className="text-[#A78BFA] shrink-0">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" className="text-[#A78BFA] shrink-0" aria-hidden="true">
             <path
               d="M9 16A7 7 0 1 0 9 2a7 7 0 0 0 0 14Zm10 3-4.35-4.35"
               stroke="currentColor"
@@ -232,29 +245,28 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
               setQuery(e.target.value);
               setSelectedIndex(0);
             }}
+            aria-label="Command palette search"
             className="flex-1 bg-transparent border-none text-[14px] text-white placeholder-slate-400 focus:outline-none"
           />
-          <kbd
-            className="px-2 py-0.5 rounded text-[10px] font-mono font-medium text-slate-400"
-            style={{ background: "rgba(255, 255, 255, 0.08)", border: "1px solid rgba(255, 255, 255, 0.1)" }}
-          >
-            ESC
-          </kbd>
+          <kbd className="ts-kbd">ESC</kbd>
         </div>
 
         {/* Toast alert if triggered */}
         {toastMessage && (
-          <div className="bg-[#6C47FF]/20 border-b border-[#6C47FF]/40 text-[#C4B5FD] text-[12px] px-4 py-2 font-medium flex items-center justify-between animate-fade">
+          <div
+            role="status"
+            className="bg-[#6C47FF]/20 border-b border-[#6C47FF]/40 text-[#C4B5FD] text-[12px] px-4 py-2 font-medium flex items-center justify-between ts-toast"
+          >
             <span>{toastMessage}</span>
-            <span>✓</span>
+            <span aria-hidden="true">✓</span>
           </div>
         )}
 
         {/* Actions List */}
-        <div className="max-h-[380px] overflow-y-auto p-2 space-y-1">
+        <div className="max-h-[380px] overflow-y-auto p-2 space-y-1 ts-scroll-fade" role="listbox" aria-label="Available commands">
           {filtered.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-[13px]">
-              No actions found for "{query}"
+              No actions found for &quot;{query}&quot;
             </div>
           ) : (
             filtered.map((item, idx) => {
@@ -262,18 +274,18 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
               return (
                 <div
                   key={item.id}
+                  role="option"
+                  aria-selected={isSelected}
                   onClick={() => item.run()}
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-[8px] cursor-pointer transition-all duration-120 ${
-                    isSelected
-                      ? "bg-[#6C47FF]/20 text-white"
-                      : "text-slate-300 hover:bg-white/[0.04]"
+                    isSelected ? "bg-[#6C47FF]/20 text-white" : "text-slate-300 hover:bg-white/[0.04]"
                   }`}
                   style={{
                     border: isSelected ? "1px solid rgba(108, 71, 255, 0.4)" : "1px solid transparent",
                   }}
                 >
-                  <span className="text-[16px] w-[26px] h-[26px] rounded-[6px] bg-[#161B2E] flex items-center justify-center shrink-0 border border-white/5">
+                  <span className="text-[16px] w-[26px] h-[26px] rounded-[6px] bg-[#161B2E] flex items-center justify-center shrink-0" style={{ border: "1px solid var(--border-dim)" }} aria-hidden="true">
                     {item.icon}
                   </span>
                   <div className="flex-1 min-w-0">
@@ -304,19 +316,19 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
 
         {/* Footer info bar */}
         <div
-          className="px-4 py-2.5 bg-[#0C0F1A] flex items-center justify-between text-[11px] text-slate-400"
-          style={{ borderTop: "1px solid var(--border)" }}
+          className="px-4 py-2.5 flex items-center justify-between text-[11px] text-slate-400"
+          style={{ background: "var(--bg-page)", borderTop: "1px solid var(--border)" }}
         >
           <div className="flex items-center gap-3">
             <span>
-              Use <kbd className="font-mono text-slate-300 bg-white/10 px-1 rounded">↑</kbd> <kbd className="font-mono text-slate-300 bg-white/10 px-1 rounded">↓</kbd> to navigate
+              Use <kbd className="ts-kbd">↑</kbd> <kbd className="ts-kbd">↓</kbd> to navigate
             </span>
             <span>
-              <kbd className="font-mono text-slate-300 bg-white/10 px-1 rounded">↵</kbd> to execute
+              <kbd className="ts-kbd">↵</kbd> to execute
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-[#A78BFA] font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#6C47FF] animate-ping" />
+          <div className="flex items-center gap-1.5 font-medium" style={{ color: "var(--accent-text)" }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#6C47FF]" />
             TraceSketch DevEngine
           </div>
         </div>

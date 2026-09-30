@@ -1,17 +1,18 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Breadcrumbs } from "../components/Breadcrumbs";
-import { Panel } from "../components/Panel";
+import { Badge, CopyButton, PageHeader } from "../components/ui";
 import { useConfig } from "../context/ConfigContext";
 
 export function Settings() {
   const { instanceId, apiBaseUrl } = useConfig();
   const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(instanceId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
     } catch {
       const ta = document.createElement("textarea");
       ta.value = instanceId;
@@ -19,118 +20,100 @@ export function Settings() {
       ta.select();
       document.execCommand("copy");
       ta.remove();
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
     }
+    setCopied(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 2000);
   }
 
   return (
-    <div>
+    <div className="space-y-5">
       <Breadcrumbs items={[{ label: "traceSketch", to: "/" }, { label: "Settings" }]} />
-      <div className="mb-6">
-        <h1 className="text-[26px] font-extrabold tracking-[-0.02em] leading-none mb-1 text-white flex items-center gap-3">
-          <span>Settings & Config</span>
-          <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#6C47FF]/20 text-[#C4B5FD] border border-[#6C47FF]/30 font-medium">
-            Instance
-          </span>
-        </h1>
-        <p className="text-[12px] text-slate-400">
-          Local configuration and credentials for the TraceSketch SQLite collector.
-        </p>
+
+      <PageHeader
+        title="Settings & Config"
+        description="Local configuration and credentials for the TraceSketch SQLite collector."
+        badge={<Badge>Instance</Badge>}
+      />
+
+      <div className="max-w-[820px] space-y-4">
+        <section className="ts-card ts-stagger">
+          <div className="ts-card-header">
+            <div>
+              <div className="ts-card-title">Instance Identity</div>
+              <div className="ts-card-subtitle">Unique identifier for this machine&apos;s local SQLite collector.</div>
+            </div>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#10B981] shadow-[0_0_8px_#10B981] shrink-0" aria-label="Collector reachable" />
+          </div>
+
+          <div className="ts-card-body space-y-5">
+            <div>
+              <label className="ts-label">Instance ID</label>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <code
+                  className="flex-1 min-w-[240px] ts-mono text-[13px] rounded-[8px] px-3.5 py-2.5 break-all text-white font-medium select-all"
+                  style={{ background: "var(--bg-page)", border: "1px solid var(--border)" }}
+                >
+                  {instanceId}
+                </code>
+                <button onClick={copy} className="btn-secondary">
+                  Copy ID
+                </button>
+              </div>
+              {copied && (
+                <div role="status" className="ts-pop text-[11px] font-medium mt-2 flex items-center gap-1.5" style={{ color: "var(--green)" }}>
+                  <span aria-hidden="true">✓</span> Copied instance ID to clipboard.
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="rounded-[10px] p-4 ts-stagger" style={{ ["--stagger-i" as string]: 1, background: "var(--bg-surface-2)", border: "1px solid var(--border)" }}>
+                <div className="ts-overline">Collector Endpoint</div>
+                <div className="ts-mono text-[12px] text-white font-medium break-all mt-1.5">
+                  {apiBaseUrl || `http://localhost:4000 (Vite proxy)`}
+                </div>
+              </div>
+
+              <div className="rounded-[10px] p-4 ts-stagger" style={{ ["--stagger-i" as string]: 2, background: "var(--bg-surface-2)", border: "1px solid var(--border)" }}>
+                <div className="ts-overline" style={{ color: "var(--blue)" }}>
+                  Local-First Isolation
+                </div>
+                <div className="text-[12px] leading-[18px] mt-1.5 text-slate-300">
+                  All traces are stored in <code className="ts-mono" style={{ color: "var(--accent-text)" }}>~/.tracebox/tracebox.db</code>. No telemetry
+                  leaves your machine.
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="ts-card ts-stagger" style={{ ["--stagger-i" as string]: 3 }}>
+          <div className="ts-card-header">
+            <div>
+              <div className="ts-card-title">Send a trace manually</div>
+              <div className="ts-card-subtitle">Use your instance ID and secret to verify ingestion end to end.</div>
+            </div>
+            <CopyButton
+              value={`curl -X POST ${apiBaseUrl || "http://localhost:4000"}/traces -H "Content-Type: application/json" -H "x-instance-id: ${instanceId}" -H "x-instance-secret: <your-secret>" -d '{"method":"GET","path":"/api/ping","status_code":200,"duration_ms":42,"environment":"development"}'`}
+              className="btn-secondary !py-1 !px-2.5 !text-[11px]"
+              copiedLabel="Copied"
+              title="Copy curl command"
+            >
+              Copy curl
+            </CopyButton>
+          </div>
+          <div className="ts-card-body">
+            <pre className="text-[12px] leading-[20px] font-mono whitespace-pre-wrap break-all p-3.5 rounded-[9px] text-slate-300" style={{ background: "var(--bg-page)", border: "1px solid var(--border)" }}>
+{`curl -X POST ${apiBaseUrl || "http://localhost:4000"}/traces \\
+  -H "Content-Type: application/json" \\
+  -H "x-instance-id: ${instanceId}" \\
+  -H "x-instance-secret: <your-secret>" \\
+  -d '{"method":"GET","path":"/api/ping","status_code":200,"duration_ms":42}'`}
+            </pre>
+          </div>
+        </section>
       </div>
-
-      <Panel className="max-w-[760px] overflow-hidden">
-        <div
-          className="px-5 py-3.5 flex items-center justify-between"
-          style={{
-            borderBottom: "1px solid var(--border)",
-            background: "var(--bg-surface-2)",
-          }}
-        >
-          <div>
-            <div className="text-[14px] font-semibold text-white">
-              Instance Identity
-            </div>
-            <div className="text-[12px] text-slate-400">
-              Unique identifier for this machine's local SQLite collector.
-            </div>
-          </div>
-          <span className="w-2.5 h-2.5 rounded-full bg-[#10B981] shadow-[0_0_8px_#10B981]" />
-        </div>
-
-        <div className="p-5 space-y-5">
-          <div>
-            <label
-              className="text-[11px] font-semibold tracking-[0.06em] uppercase font-mono"
-              style={{ color: "var(--text-dim)" }}
-            >
-              Instance ID
-            </label>
-            <div className="mt-1.5 flex items-center gap-2">
-              <code
-                className="flex-1 font-mono text-[13px] rounded-[8px] px-3.5 py-2.5 break-all text-white font-medium"
-                style={{
-                  background: "rgba(10, 13, 20, 0.6)",
-                  border: "1px solid var(--border-accent)",
-                }}
-              >
-                {instanceId}
-              </code>
-              <button
-                onClick={copy}
-                className="shrink-0 px-4 py-2.5 rounded-[8px] text-[13px] font-semibold transition-all flex items-center gap-1.5"
-                style={{
-                  border: "1px solid var(--border)",
-                  background: copied ? "var(--green-bg)" : "var(--bg-surface-2)",
-                  color: copied ? "var(--green)" : "var(--text-primary)",
-                  cursor: "pointer",
-                }}
-                onMouseEnter={(e) => {
-                  if (!copied) e.currentTarget.style.borderColor = "var(--accent)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!copied) e.currentTarget.style.borderColor = "var(--border)";
-                }}
-              >
-                {copied ? "Copied ✓" : "Copy ID"}
-              </button>
-            </div>
-            {copied && (
-              <div className="text-[11px] font-medium font-mono mt-1.5 text-[#10B981] flex items-center gap-1">
-                <span>✓</span> Copied instance ID to clipboard.
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div
-              className="rounded-[8px] p-3.5"
-              style={{
-                background: "var(--bg-surface-2)",
-                border: "1px solid var(--border)",
-              }}
-            >
-              <div className="text-[11px] font-semibold font-mono tracking-[0.04em] uppercase text-slate-400">
-                Collector Endpoint
-              </div>
-              <div className="font-mono text-[12px] text-white font-medium break-all mt-1">
-                {apiBaseUrl || `http://localhost:4000 (Vite proxy)`}
-              </div>
-            </div>
-
-            <div
-              className="rounded-[8px] p-3.5 bg-[#161B2B] border border-[#262E44]"
-            >
-              <div className="text-[11px] font-semibold font-mono tracking-[0.04em] uppercase text-[#38BDF8]">
-                Local-First Isolation
-              </div>
-              <div className="text-[12px] leading-[18px] mt-1 text-slate-300">
-                All traces are stored in <code className="text-[#A78BFA]">~/.tracebox/tracebox.db</code>. No data ever leaves your computer.
-              </div>
-            </div>
-          </div>
-        </div>
-      </Panel>
     </div>
   );
 }

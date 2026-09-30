@@ -19,4 +19,15 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // A context file has to export its consumer hook next to the provider, so
+    // these names are exempt from the fast-refresh component-only rule.
+    files: ['src/context/*.tsx'],
+    rules: {
+      'react-refresh/only-export-components': [
+        'error',
+        { allowExportNames: ['useConfig', 'useTraceSimulator'] },
+      ],
+    },
+  },
 ])
