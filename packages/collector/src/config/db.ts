@@ -88,10 +88,9 @@ CREATE TABLE IF NOT EXISTS group_history (
   instance_id TEXT NOT NULL,
   entry_type TEXT NOT NULL,
   trace_id TEXT,
-  note TEXT,
+  data TEXT,             
   saved_at INTEGER NOT NULL
 )
-
 
   `);
 

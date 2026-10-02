@@ -2,7 +2,7 @@ import { db } from "../config/db";
 import crypto from 'crypto';
 
 
-export function checktraceidExists(traceId: string): boolean {
+export function checktraceidExists(traceId: string): boolean { 
   const row = db.prepare('SELECT * FROM traces WHERE trace_id = ?').get(traceId);
   return !!row;
 }
