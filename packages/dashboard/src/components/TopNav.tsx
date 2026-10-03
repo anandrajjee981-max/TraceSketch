@@ -1,6 +1,129 @@
-import { Link, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useConfig } from "../context/ConfigContext";
+import { listMyGroups, type GroupSummary } from "../api/client";
+import { relativeTime } from "../lib/format";
 import { TSLogoMarkFilled } from "./TSLogo";
+
+/**
+ * Top-right dropdown of every group this instance has previously joined.
+ *
+ * Backed by the relay's shared group_history, which has no TTL — so these
+ * survive the relay's 6h session expiry, unlike the live relay feed, and both
+ * peers see the same list.
+ */
+function JoinedGroupsMenu() {
+  const { instanceId } = useConfig();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [groups, setGroups] = useState<GroupSummary[] | null>(null);
+  const [error, setError] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open || groups !== null) return;
+    let cancelled = false;
+    listMyGroups({ instanceId })
+      .then((data) => {
+        if (!cancelled) setGroups(data.groups ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, groups, instanceId]);
+
+  // Close on outside click / Escape.
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium btn-secondary"
+        style={{ color: "var(--text-secondary)" }}
+        title="Previously joined groups"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M2 4h12M2 8h12M2 12h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+        <span>Groups</span>
+        {groups && groups.length > 0 && (
+          <span className="ts-numeric" style={{ color: "var(--text-dim)" }}>
+            {groups.length}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-[calc(100%+6px)] w-[280px] rounded-[10px] overflow-hidden ts-card"
+          style={{ background: "var(--bg-surface-2)", border: "1px solid var(--border)", boxShadow: "var(--shadow-lg)" }}
+        >
+          <p className="ts-overline px-3 py-2" style={{ borderBottom: "1px solid var(--border-dim)" }}>
+            Joined Groups
+          </p>
+
+          <div className="max-h-[320px] overflow-y-auto">
+            {error ? (
+              <p className="px-3 py-3 text-[11px]" style={{ color: "var(--red)" }}>
+                Could not load groups from the collector.
+              </p>
+            ) : groups === null ? (
+              <p className="px-3 py-3 text-[11px]" style={{ color: "var(--text-dim)" }}>
+                Loading…
+              </p>
+            ) : groups.length === 0 ? (
+              <p className="px-3 py-3 text-[11px]" style={{ color: "var(--text-dim)" }}>
+                No groups yet. Create or join one from the Relay page.
+              </p>
+            ) : (
+              groups.map((g) => (
+                <button
+                  key={g.group_code}
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate(`/relay?group=${encodeURIComponent(g.group_code)}`);
+                  }}
+                  className="w-full text-left px-3 py-2 flex items-center justify-between gap-2 hover:bg-[var(--bg-surface-3)] transition-colors"
+                  style={{ borderBottom: "1px solid var(--border-dim)" }}
+                >
+                  <span className="ts-mono font-bold tracking-[0.18em] text-[13px] text-white">
+                    {g.group_code}
+                  </span>
+                  <span className="text-[10px] ts-numeric shrink-0" style={{ color: "var(--text-dim)" }}>
+                    {g.share_entries > 0 ? `${g.share_entries} shared · ` : ""}
+                    {relativeTime(g.last_activity)}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function TopNav({ onOpenCommandPalette }: { onOpenCommandPalette?: () => void }) {
   const { instanceId } = useConfig();
@@ -85,6 +208,9 @@ export function TopNav({ onOpenCommandPalette }: { onOpenCommandPalette?: () => 
       )}
 
       <div className="flex-1" />
+
+      {/* Previously joined groups */}
+      <JoinedGroupsMenu />
 
       {/* Collector Live Status Chip */}
       <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium font-mono px-2.5 py-1 rounded-full shrink-0 ts-numeric" style={{ color: "var(--text-secondary)", background: "var(--bg-surface-2)", border: "1px solid var(--border)" }}>

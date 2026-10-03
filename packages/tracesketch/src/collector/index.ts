@@ -6,6 +6,7 @@ import tracerouter from "./routes/trace.routes";
 import replayrouter from "./routes/replay.route";
 import eventsRouter from "./routes/events.routes";
 import regressionrouter from "./routes/regression.route";
+import groupRouter from "./routes/group.routes";
 import cron from 'node-cron';
 import { cleanExpiredTraces } from "./dao/trace.dao";
 
@@ -53,6 +54,7 @@ app.use("/traces", replayrouter);
 app.use("/traces", regressionrouter);
 app.use("/traces", tracerouter);
 app.use("/traces", eventsRouter);
+app.use("/groups", groupRouter);
 
 export function startCollector() {
   initSchema();

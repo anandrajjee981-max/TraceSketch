@@ -13,6 +13,7 @@ export default defineConfig({
       '/traces': { target: collectorTarget, changeOrigin: true },
       '/health': { target: collectorTarget, changeOrigin: true },
       '/instance': { target: collectorTarget, changeOrigin: true },
+      '/groups': { target: collectorTarget, changeOrigin: true },
     },
   },
 })

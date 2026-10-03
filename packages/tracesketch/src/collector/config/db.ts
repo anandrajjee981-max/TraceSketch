@@ -72,10 +72,23 @@ expected_status INTEGER,
 expected_schema TEXT,
 created_at INTEGER NOT NULL,
 FOREIGN KEY (source_trace_id) REFERENCES traces(trace_id) ON DELETE CASCADE
-)
+);
 
+-- Durable archive of relay activity. Deliberately has no TTL: the relay's own
+-- MongoDB expires groups and messages after 6h, so this table is the only place
+-- a shared trace or replay result survives long-term.
+CREATE TABLE IF NOT EXISTS group_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_code TEXT NOT NULL,
+  instance_id TEXT NOT NULL,
+  entry_type TEXT NOT NULL,
+  trace_id TEXT,
+  data TEXT,
+  saved_at INTEGER NOT NULL
+);
 
-
+CREATE INDEX IF NOT EXISTS idx_group_history_group ON group_history(group_code, saved_at);
+CREATE INDEX IF NOT EXISTS idx_group_history_instance ON group_history(instance_id);
 
   `);
 

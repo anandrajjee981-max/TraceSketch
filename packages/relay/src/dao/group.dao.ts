@@ -47,12 +47,36 @@ export async function getGroupByInstanceId(instanceId: string): Promise<{ groupC
   return { groupCode: existing.groupCode };
 }
 
-export async function leaveGroup(groupCode: string, instanceId: string): Promise<boolean> {
-  const deleted = await groupmodel.findOneAndDelete({
-    groupCode,
-    $or: [{ creatorInstanceId: instanceId }, { joinerInstanceId: instanceId }],
-  });
-  return deleted !== null;
+export type LeaveOutcome = "joiner_left" | "creator_left" | "not_found" | "not_member";
+
+/**
+ * Release only the caller's own seat.
+ *
+ * This used to `findOneAndDelete` the whole Group document, which meant a
+ * joiner leaving tore down the creator's session as well: the creator's next
+ * `/session` lookup 404'd, re-joining the same code reported "group not found
+ * or has expired", and neither peer could post again.
+ *
+ * Both steps are single atomic operations so two simultaneous departures
+ * cannot both claim the same outcome.
+ */
+export async function leaveGroup(groupCode: string, instanceId: string): Promise<LeaveOutcome> {
+  // Joiner frees the seat. The group survives, so the same code can be joined
+  // again and the creator keeps working.
+  const freed = await groupmodel.findOneAndUpdate(
+    { groupCode, joinerInstanceId: instanceId },
+    { $set: { joinerInstanceId: null } },
+    { new: true },
+  );
+  if (freed) return "joiner_left";
+
+  // Creator ends the session. It is a two-seat session the creator owns, so
+  // this necessarily tears it down for both peers.
+  const tornDown = await groupmodel.findOneAndDelete({ groupCode, creatorInstanceId: instanceId });
+  if (tornDown) return "creator_left";
+
+  const stillThere = await groupmodel.findOne({ groupCode }).lean();
+  return stillThere ? "not_member" : "not_found";
 }
 
 export async function createGroup(creatorInstanceId: string): Promise<string> {

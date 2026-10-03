@@ -25,15 +25,27 @@ export async function leaveGroupController(req: Request, res: Response) {
       return res.status(400).json({ message: "instanceId is required" });
     }
 
-    const left = await leaveGroup(groupCode, instanceId);
-    if (!left) {
-      return res.status(404).json({ message: "group not found or instance is not a member" });
+    const outcome = await leaveGroup(groupCode, instanceId);
+
+    if (outcome === "not_found") {
+      return res.status(404).json({ message: "group not found or expired" });
+    }
+    if (outcome === "not_member") {
+      return res.status(403).json({ message: "you are not a member of this group" });
     }
 
     const io = req.app.get("io");
-    io?.to(groupCode).emit("peer-left", { instanceId });
 
-    return res.status(200).json({ message: "Left group" });
+    if (outcome === "creator_left") {
+      // The session is gone for both peers, so say so explicitly instead of
+      // letting the remaining peer sit in a dead room.
+      io?.to(groupCode).emit("session-ended", { instanceId, reason: "creator_left" });
+    } else {
+      // Seat freed, group still alive: the peer may be replaced by a new joiner.
+      io?.to(groupCode).emit("peer-left", { instanceId });
+    }
+
+    return res.status(200).json({ message: "Left group", outcome });
   } catch (err) {
     console.error("leaveGroupController error:", err);
     return res.status(500).json({ message: "internal server error" });

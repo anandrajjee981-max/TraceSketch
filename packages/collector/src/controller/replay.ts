@@ -2,8 +2,8 @@ import { getTrace } from "../dao/trace.dao";
 import { getAllReplays, getReplaysByTraceId, insertReplayRun } from "../dao/replay.dao";
 import { Request, Response } from "express";
 import { stripUnsafeHeaders } from "../utils/headers";
-import { validateUrl } from "   ../../security/url-validator";
-import { resolveAndValidate } from "../../security/ip-validator";
+import { validateUrl } from "../security/url-validator";
+import { resolveAndValidate } from "../security/ip-validator";
 
 export async function replayTrace(req: Request, res: Response) {
   const targetBaseUrl = typeof req.body?.target_base_url === "string"
@@ -173,5 +173,4 @@ export async function listAllReplays(req: Request, res: Response) {
     res.status(500).json({ message: "internal server error" });
   }
 }
-
 

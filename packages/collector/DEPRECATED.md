@@ -1,1 +1,1 @@
-This package is no longer used for development. All active development happens in packages/tracesketch. Do not run `npm run dev` from here — it will run stale code. See packages/tracesketch/src/ for the current source.
+This package is no longer used for development. All active development happens in `packages/tracesketch`. The `npm run dev` script here forwards to the active package; do not use `dev-DEPRECATED-DO-NOT-USE` or `start`, which run stale collector code. See `packages/tracesketch/src/` for the current source.

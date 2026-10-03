@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useConfig } from "../context/ConfigContext";
-import { getRelayBase } from "../api/client";
+import {
+  getRelayBase,
+  getGroupHistory,
+  recordGroupHistory,
+  markGroupJoined,
+  type GroupHistoryRow,
+} from "../api/client";
 import { ErrorState } from "../components/EmptyState";
 import { Badge, CopyButton, PageHeader } from "../components/ui";
 
@@ -39,7 +46,83 @@ const TYPE_OPTIONS: { value: MessageType; label: string; hint: string }[] = [
   { value: "crazy", label: "Crazy", hint: "Ephemeral socket broadcast only — never saved to database" },
 ];
 
-type PageState = "no-group" | "in-group" | "unreachable";
+/**
+ * "restoring" covers the async window where we ask the relay whether the cached
+ * group code is still valid. Rendering "in-group" optimistically caused a flash
+ * of a dead group code before the check resolved.
+ */
+type PageState = "restoring" | "no-group" | "in-group" | "unreachable";
+
+/**
+ * Every persisted entry type is surfaced in History, notes included, so an
+ * archived session replays the whole conversation. "joined" markers are the one
+ * exception — they record membership, not conversation.
+ */
+type HistoryEntryType = Exclude<PersistedType, never>;
+
+const HISTORY_TYPES: HistoryEntryType[] = ["note", "trace_share", "replay_result"];
+
+type ViewMode = "live" | "history";
+
+/**
+ * One History row, normalised across its two sources: the collector's
+ * `group_history` table and the live `group-message` socket event. Keeping a
+ * single shape is what lets a socket-delivered entry and the persisted row for
+ * the same message collapse into one list item.
+ */
+interface HistoryEntry {
+  entryType: HistoryEntryType;
+  instanceId: string;
+  /** Null unless a trace id was actually persisted. See note on historyKey. */
+  traceId: string | null;
+  summary: string;
+  /** ISO 8601, normalised from the collector's epoch-ms `saved_at`. */
+  timestamp: string;
+}
+
+/**
+ * Dedup key for a history entry.
+ *
+ * Deliberately NOT the source's own primary key: a collector row carries a
+ * SQLite autoincrement `id` while a socket message carries a Mongo ObjectId
+ * `id`. Keying on those would give the same logical message two different keys
+ * and guarantee the duplicate this is meant to prevent. These three fields are
+ * byte-identical for the same logical message across both sources, because the
+ * writer stores the message text verbatim in `data`.
+ */
+function historyKey(e: HistoryEntry): string {
+  return `${e.instanceId}|${e.entryType}|${e.summary}`;
+}
+
+function mergeHistory(existing: HistoryEntry[], incoming: HistoryEntry[]): HistoryEntry[] {
+  const seen = new Set(existing.map(historyKey));
+  const result = [...existing];
+  for (const e of incoming) {
+    const k = historyKey(e);
+    if (!seen.has(k)) {
+      seen.add(k);
+      result.push(e);
+    }
+  }
+  return result;
+}
+
+function isHistoryType(type: MessageType | undefined): type is HistoryEntryType {
+  // "crazy" is socket-only and never persisted, so it is excluded here.
+  return type === "note" || type === "trace_share" || type === "replay_result";
+}
+
+/** Adapt a collector group_history row into the shared History shape. */
+function rowToHistoryEntry(row: GroupHistoryRow): HistoryEntry | null {
+  if (!isHistoryType(row.entry_type as MessageType)) return null;
+  return {
+    entryType: row.entry_type as HistoryEntryType,
+    instanceId: row.instance_id,
+    traceId: row.trace_id ?? null,
+    summary: row.data ?? "",
+    timestamp: new Date(row.saved_at).toISOString(),
+  };
+}
 
 const LS_KEY = "tracesketch_group_code";
 
@@ -106,18 +189,28 @@ export interface RelayProps {
 
 export function Relay({ embedded = false, onClose, initialSharedText }: RelayProps = {}) {
   const { instanceId } = useConfig();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const RELAY_BASE = getRelayBase();
+  /** ?group=CODE opens a past group's archived history (from the navbar list). */
+  const archiveCode = searchParams.get("group");
 
   // ── State ──
-  const [pageState, setPageState] = useState<PageState>(() =>
-    localStorage.getItem(LS_KEY) ? "in-group" : "no-group"
-  );
+  // Starts as "restoring" — the mount effect decides whether the relay still
+  // honours the cached group code before anything is rendered.
+  const [pageState, setPageState] = useState<PageState>("restoring");
   const [groupCode, setGroupCode] = useState<string | null>(() => localStorage.getItem(LS_KEY));
   const [messages, setMessages] = useState<RelayMessage[]>([]);
   const [messageInput, setMessageInput] = useState("");
   const [messageType, setMessageType] = useState<MessageType>("note");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+
+  // ── History state (relay group_history) ──
+  const [viewMode, setViewMode] = useState<ViewMode>("live");
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   // Sync initialSharedText without an effect: when the host hands us new shared
   // text we adjust state during render (React's documented pattern).
@@ -167,9 +260,51 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
     [RELAY_BASE, scrollFeed]
   );
 
+  // ── Fetch archived group history from the relay ──
+  // Independent of the live feed: a failure here sets historyError only and
+  // must never take down the live relay view.
+  //
+  // `manageLoading: false` is used by callers that already raised the loading
+  // flag during render, so no state is written synchronously from an effect.
+  // The flag is always lowered once the request settles.
+  const fetchGroupHistory = useCallback(
+    async (code: string, opts?: { manageLoading?: boolean }) => {
+      const manageLoading = opts?.manageLoading !== false;
+      if (manageLoading) {
+        setHistoryLoading(true);
+        setHistoryError(null);
+      }
+      try {
+        const data = await getGroupHistory(code, { types: HISTORY_TYPES });
+        const rows = (data.entries ?? []).map(rowToHistoryEntry).filter((e): e is HistoryEntry => e !== null);
+        // Oldest first, matching the relay's sort order.
+        setHistory((prev) => mergeHistory(prev, rows));
+      } catch (e) {
+        setHistoryError(e instanceof Error ? e.message : "Failed to load group history");
+      } finally {
+        setHistoryLoading(false);
+      }
+    },
+    []
+  );
+
+  // ── Abandon a group that the relay no longer recognises ──
+  // Shared by the mount-time validation and the socket's group-error event, so
+  // an expired group always ends up in the same clean state.
+  const abandonGroup = useCallback((reason: string | null) => {
+    socketRef.current?.disconnect();
+    socketRef.current = null;
+    localStorage.removeItem(LS_KEY);
+    setGroupCode(null);
+    setMessages([]);
+    setHistory([]);
+    setHistoryError(null);
+    setLeaveError(reason);
+    setPageState("no-group");
+  }, []);
+
   // ── Connect socket ──
-  const connectSocket = useCallback(
-    (code: string) => {
+  const connectSocket = useCallback(    (code: string) => {
       if (socketRef.current) {
         socketRef.current.disconnect();
       }
@@ -181,8 +316,28 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
       });
 
       socket.on("group-message", (msg: RelayMessage) => {
+        // Live behaviour, unchanged.
         setMessages((prev) => mergeMessages(prev, [msg]));
         scrollFeed();
+
+        // Mirror persisted messages into History so the archived conversation
+        // stays current without a refresh. mergeHistory drops it if the relay
+        // already returned the same row. "crazy" is socket-only and never
+        // persisted, so isHistoryType excludes it.
+        const { type } = msg;
+        if (isHistoryType(type)) {
+          setHistory((prev) =>
+            mergeHistory(prev, [
+              {
+                entryType: type,
+                instanceId: msg.instanceId,
+                traceId: null,
+                summary: msg.summaryText,
+                timestamp: msg.createdAt,
+              },
+            ])
+          );
+        }
       });
 
       // Ephemeral path. Normalised into the same feed shape so the UI treats
@@ -204,6 +359,15 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
         setSendError(message);
       });
 
+      socket.on("group-error", ({ code, message }: { code: string; message: string }) => {
+        // The relay rejects join-room when the group has expired or this
+        // instance is not a member. Without this the page sat on a dead group
+        // code forever, because nothing else re-checks it after mount.
+        if (code === "NOT_A_MEMBER" || code === "INTERNAL_ERROR" || code === "NOT_JOINED") {
+          abandonGroup(`Session expired — ${message}`);
+        }
+      });
+
       socket.on("peer-left", ({ instanceId: leftId }: { instanceId: string }) => {
         if (leftId !== instanceId) {
           // inject a system notice into the feed
@@ -218,9 +382,18 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
         }
       });
 
+      socket.on("session-ended", ({ instanceId: leftId }: { instanceId: string }) => {
+        // The creator owns the session, so their departure deletes the group.
+        // The room is dead but still exists client-side, so drop back to the
+        // Create/Join screen instead of leaving a dead group code on screen.
+        if (leftId !== instanceId) {
+          abandonGroup("The developer who created this session left, so it has ended.");
+        }
+      });
+
       return socket;
     },
-    [RELAY_BASE, instanceId, scrollFeed]
+    [RELAY_BASE, instanceId, scrollFeed, abandonGroup]
   );
 
   // ── Enter State B ──
@@ -230,42 +403,112 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
       setGroupCode(code);
       setPageState("in-group");
       setMessages([]);
+      setHistory([]);
+      setHistoryError(null);
+      setLeaveError(null);
+      setViewMode("live");
       fetchHistory(code);
+      fetchGroupHistory(code);
       connectSocket(code);
+      // Record membership so this group shows up in the navbar history list,
+      // even if this instance only ever sent plain notes.
+      void markGroupJoined(code, { instanceId });
     },
-    [fetchHistory, connectSocket]
+    [fetchHistory, fetchGroupHistory, connectSocket, instanceId]
   );
 
-  // ── On mount: restore group — localStorage first, then relay fallback ──
+  // ── Archive mode: ?group=CODE re-points the page at a past group's history ──
+  // Applied during render (React's documented "adjust state while rendering"
+  // pattern, already used above for initialSharedText) so it happens before any
+  // effect runs and therefore can't race the live restore below.
+  const [lastArchiveCode, setLastArchiveCode] = useState<string | null>(archiveCode);
+  if (archiveCode !== lastArchiveCode) {
+    setLastArchiveCode(archiveCode);
+    if (archiveCode) {
+      setGroupCode(archiveCode);
+      setPageState("in-group");
+      setViewMode("history");
+      setMessages([]);
+      setHistory([]);
+      setLeaveError(null);
+      // Raise the spinner here so the effect below only performs the fetch.
+      setHistoryLoading(true);
+      setHistoryError(null);
+    }
+  }
+
+  // ── Load a group's persisted history ──
   useEffect(() => {
+    if (!archiveCode) return;
+    // Archive mode has no live socket: the group has almost certainly expired,
+    // and viewing it must not make it look like the active session.
+    socketRef.current?.disconnect();
+    socketRef.current = null;
+    localStorage.removeItem(LS_KEY);
+    // Deferred by a tick so the spinner raised during render actually paints
+    // before the request starts, instead of racing it inside the same commit.
+    const timer = setTimeout(() => {
+      void fetchGroupHistory(archiveCode, { manageLoading: false });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [archiveCode, fetchGroupHistory]);
+
+  // ── Restore the live group, but only if the relay still knows about it ──
+  useEffect(() => {
+    // Archive mode positioned the page during render; nothing to restore.
+    if (archiveCode) return;
+
     let cancelled = false;
+
+    // A group lives for 6h in the relay, then it 404s. localStorage outlives
+    // that, so a code read from it can point at a group that no longer exists.
+    // The relay's session lookup is the only authority on whether it is still
+    // alive, so it is consulted unconditionally — previously this was skipped
+    // whenever localStorage had a value, which left a dead group code pinned to
+    // the page forever.
     async function restore() {
-      const saved = localStorage.getItem(LS_KEY);
-      if (saved) {
-        if (!cancelled) enterGroup(saved);
-        return;
-      }
-      // localStorage is empty — check the relay in case this instance still
-      // has an active backend session (e.g. after a tab crash / cache clear).
+      let activeCode: string | null = null;
       try {
         const res = await fetch(`${RELAY_BASE}/session/${encodeURIComponent(instanceId)}`);
         if (res.ok) {
-          const data = (await res.json()) as { groupCode: string };
-          if (data.groupCode && !cancelled) enterGroup(data.groupCode);
+          const data = (await res.json()) as { groupCode?: string };
+          if (data.groupCode) activeCode = data.groupCode;
         }
-        // 404 = no session — stay on State A, that's correct
+        // 404 = no live session for this instance
       } catch {
-        // relay unreachable — stay on State A
+        // relay unreachable — fall through and stay on State A
       }
+
+      if (cancelled) return;
+
+      const saved = localStorage.getItem(LS_KEY);
+
+      if (activeCode) {
+        // The relay may know a different code than the one cached locally
+        // (e.g. joined from another tab). The relay wins.
+        if (saved && saved !== activeCode) localStorage.setItem(LS_KEY, activeCode);
+        enterGroup(activeCode);
+        return;
+      }
+
+      if (saved) {
+        // Stale: the group this instance was in has expired or been left.
+        // Drop it so we don't render a group code that can never sync.
+        abandonGroup(null);
+        return;
+      }
+      // Stay on State A — Create/Join. Past sessions remain reachable from the
+      // navbar group list.
+      setPageState("no-group");
     }
+
     restore();
     return () => {
       cancelled = true;
       socketRef.current?.disconnect();
     };
-    // only on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [archiveCode]);
 
   // ── Create Group ──
   const handleCreate = async () => {
@@ -358,6 +601,24 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
         setSendError(data.message ?? `HTTP ${res.status}`);
         return;
       }
+      // Mirror into the collector's local group_history. The durable record is
+      // written by the relay itself when it accepts this message — a browser
+      // write only reaches this machine's collector, so the peer would never
+      // see it. This call is best-effort local bookkeeping and is allowed to
+      // fail. The relay payload carries no trace id, so trace_id stays null and
+      // the Trace Detail link stays hidden until one is actually available.
+      if (isHistoryType(messageType)) {
+        void recordGroupHistory(
+          {
+            group_code: groupCode,
+            instance_id: instanceId,
+            entry_type: messageType,
+            trace_id: null,
+            data: text,
+          },
+          { instanceId }
+        );
+      }
       // Don't add to feed here — wait for the socket group-message event
       setMessageInput("");
     } catch {
@@ -386,6 +647,8 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
       localStorage.removeItem(LS_KEY);
       setGroupCode(null);
       setMessages([]);
+      setHistory([]);
+      setHistoryError(null);
       setPageState("no-group");
       setShowJoinInput(false);
       setJoinCode("");
@@ -397,9 +660,23 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
     }
   };
 
-  // ─── State C: Unreachable ────────────────────────────────────────────────────
-  if (pageState === "unreachable") {
+  // ─── State R: Restoring ──────────────────────────────────────────────────────
+  // Rendered while we ask the relay whether the cached group code is still
+  // valid. Anything else would flash a dead group code before the check lands.
+  if (pageState === "restoring") {
     return (
+      <div
+        className={`mx-auto flex items-center justify-center gap-2 ${embedded ? "pt-1" : "max-w-[560px] pt-10"}`}
+        style={{ color: "var(--text-dim)" }}
+      >
+        <Spinner />
+        <span className="text-[12px]">Restoring session…</span>
+      </div>
+    );
+  }
+
+  // ─── State C: Unreachable ────────────────────────────────────────────────────
+  if (pageState === "unreachable") {    return (
       <div className={`mx-auto ${embedded ? "pt-2 max-w-none" : "max-w-[560px] pt-10"}`}>
         <ErrorState
           title="Unable to reach Relay server"
@@ -507,16 +784,33 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
       {/* Group code + leave */}
       <div className="p-3.5 sm:p-4 rounded-[12px] flex items-center justify-between gap-3 shrink-0 ts-card ts-stagger">
         <div className="flex flex-col gap-1 min-w-0">
-          <p className="ts-overline">Group Code — Share to Connect</p>
+          <p className="ts-overline">
+            {archiveCode ? "Archived Group — Session Expired" : "Group Code — Share to Connect"}
+          </p>
           <CodeDisplay code={groupCode!} />
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button onClick={handleLeave} disabled={leaving} className="btn-destructive shrink-0">
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M6 3H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3M10 11l3-3-3-3M13 8H6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>{leaving ? "Leaving…" : "Leave"}</span>
-          </button>
+          {archiveCode ? (
+            // No live session to leave — this just closes the archive view.
+            <button
+              onClick={() => {
+                setSearchParams({});
+                setPageState("no-group");
+                setGroupCode(null);
+                setHistory([]);
+              }}
+              className="btn-secondary shrink-0"
+            >
+              ← Back
+            </button>
+          ) : (
+            <button onClick={handleLeave} disabled={leaving} className="btn-destructive shrink-0">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M6 3H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3M10 11l3-3-3-3M13 8H6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>{leaving ? "Leaving…" : "Leave"}</span>
+            </button>
+          )}
           {embedded && onClose && (
             <button onClick={onClose} className="btn-secondary shrink-0 !px-2.5 !py-1.5" title="Close Relay Dock">
               ✕
@@ -534,15 +828,140 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
       {/* Message feed */}
       <div className="flex-1 rounded-[12px] overflow-hidden flex flex-col min-h-0 ts-card" style={{ background: "var(--bg-surface)" }}>
         <div className="ts-card-header shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#10B981] shadow-[0_0_6px_#10B981]" />
-            <span className="ts-card-title">Live Discussion</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={
+                viewMode === "live"
+                  ? { background: "#10B981", boxShadow: "0 0 6px #10B981" }
+                  : { background: "var(--text-dim)" }
+              }
+            />
+            <span className="ts-card-title">
+              {viewMode === "live" ? "Live Discussion" : "Group History"}
+            </span>
+            <div className="ts-segmented shrink-0" role="radiogroup" aria-label="Relay view">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={viewMode === "live"}
+                onClick={() => setViewMode("live")}
+                className="ts-segment"
+                title="Real-time relay feed"
+              >
+                Live
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={viewMode === "history"}
+                onClick={() => setViewMode("history")}
+                className="ts-segment"
+                title="Archived session messages and shared traces"
+              >
+                History
+              </button>
+            </div>
           </div>
           <Badge tone="neutral">
-            <span className="ts-numeric">{messages.length}</span> message{messages.length !== 1 ? "s" : ""}
+            <span className="ts-numeric">{viewMode === "live" ? messages.length : history.length}</span>{" "}
+            {viewMode === "live"
+              ? `message${messages.length !== 1 ? "s" : ""}`
+              : `entr${history.length !== 1 ? "ies" : "y"}`}
           </Badge>
         </div>
 
+        {viewMode === "history" ? (
+          // ── History panel ──
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2.5 min-h-0 ts-scroll-fade" aria-label="Group history">
+            {historyLoading ? (
+              <div className="flex items-center justify-center gap-2 h-full py-10 text-[12px]" style={{ color: "var(--text-dim)" }}>
+                <Spinner />
+                Loading history…
+              </div>
+            ) : historyError ? (
+              <div
+                className="flex flex-col items-center justify-center gap-2 h-full text-center py-10"
+                style={{ color: "var(--text-dim)" }}
+              >
+                <p className="text-[13px] font-medium" style={{ color: "var(--red)" }}>
+                  Could not load group history
+                </p>
+                <p role="alert" className="text-[11px] max-w-[320px] ts-mono">
+                  {historyError}
+                </p>
+                <p className="text-[12px] max-w-[320px]">
+                  Live relay is unaffected — switch back to Live to keep collaborating.
+                </p>
+                <button
+                  onClick={() => groupCode && fetchGroupHistory(groupCode)}
+                  className="btn-secondary mt-1 !py-1.5 !px-3"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : history.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full gap-2 text-center py-10" style={{ color: "var(--text-dim)" }}>
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center mb-1"
+                  style={{ background: "var(--bg-surface-2)", border: "1px solid var(--border)" }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ color: "var(--text-dim)" }}>
+                    <path d="M3 3v5h5M21 21v-5h-5M3.5 13a8.5 8.5 0 0 1 14-5.7M20.5 11a8.5 8.5 0 0 1-14 5.7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <p className="text-[13px] font-medium text-slate-300">No archived messages yet</p>
+                <p className="text-[12px] max-w-[300px]">
+                  Every message sent in this session is recorded here, including shared traces and replay results.
+                </p>
+              </div>
+            ) : (
+              history.map((entry) => (
+                <div
+                  key={historyKey(entry)}
+                  className="flex flex-col gap-1.5 rounded-[12px] px-3.5 py-2.5 ts-chat-in"
+                  style={{ background: "var(--bg-surface-3)", border: "1px solid var(--border)" }}
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="ts-chip-neutral !py-0 !px-1.5 !text-[9px]">
+                      {entry.entryType === "trace_share"
+                        ? "Trace Share"
+                        : entry.entryType === "replay_result"
+                          ? "Replay Result"
+                          : "Note"}
+                    </span>
+                    <span className="text-[11px] font-medium" style={{ color: entry.instanceId === instanceId ? "var(--text-secondary)" : "var(--accent-text)" }}>
+                      {entry.instanceId === instanceId ? "You" : "Peer Developer"}
+                    </span>
+                    <span className="text-[10px] ts-numeric" style={{ color: "var(--text-dim)" }} title={entry.timestamp}>
+                      {relativeTime(entry.timestamp)}
+                    </span>
+                  </div>
+
+                  <p className="text-[13px] leading-relaxed break-words" style={{ color: "#E2E8F0" }}>
+                    {entry.summary}
+                  </p>
+
+                  {entry.traceId ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/traces/${encodeURIComponent(entry.traceId!)}`)}
+                      className="self-start text-[11px] ts-mono underline underline-offset-2 hover:opacity-80"
+                      style={{ color: "var(--accent-text)" }}
+                      title="Open trace detail"
+                    >
+                      {entry.traceId}
+                    </button>
+                  ) : (
+                    <span className="text-[10px] italic" style={{ color: "var(--text-dim)" }}>
+                      no trace id recorded
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
         <div ref={feedRef} className="flex-1 overflow-y-auto p-4 flex flex-col gap-3.5 min-h-0 ts-scroll-fade" aria-live="polite" aria-label="Relay messages">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-2 text-center py-10" style={{ color: "var(--text-dim)" }}>
@@ -625,8 +1044,10 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
             })
           )}
         </div>
+        )}
 
         {/* Mode selector */}
+        {viewMode === "live" && (
         <div className="px-4 py-2 flex items-center justify-between gap-2 flex-wrap shrink-0" style={{ background: "var(--bg-surface-2)", borderTop: "1px solid var(--border-dim)" }}>
           <div className="flex items-center gap-1.5">
             <span className="ts-overline shrink-0 mr-1">Mode</span>
@@ -655,8 +1076,10 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
             </span>
           )}
         </div>
+        )}
 
         {/* Send input bar */}
+        {viewMode === "live" && (
         <div className="px-4 py-3 flex items-center gap-2.5 shrink-0" style={{ background: "var(--bg-surface-2)", borderTop: "1px solid var(--border-dim)" }}>
           <input
             type="text"
@@ -686,8 +1109,9 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
             <span>Send</span>
           </button>
         </div>
+        )}
 
-        {sendError && (
+        {sendError && viewMode === "live" && (
           <p role="alert" className="px-4 pb-2 text-[11px] shrink-0 ts-toast" style={{ color: "var(--red)", background: "var(--bg-surface-2)" }}>
             {sendError}
           </p>

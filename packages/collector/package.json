@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "main": "dist/index.js",
   "scripts": {
+    "dev": "npm run dev --workspace=tracesketch",
     "dev-DEPRECATED-DO-NOT-USE": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js"

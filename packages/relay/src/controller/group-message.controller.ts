@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { addMessage, getMessages, isValidMessageType } from "../dao/group-message.dao.js";
+import { recordHistory } from "../dao/group-history.dao.js";
 
 export async function addMessageController(req: Request, res: Response) {
   try {
@@ -33,6 +34,23 @@ export async function addMessageController(req: Request, res: Response) {
 
     if (io) {
       io.to(groupCode).emit("group-message", result.message);
+    }
+
+    // Durable shared history. Written here, server-side, rather than by the
+    // sender's browser: a browser write can only reach its own machine's
+    // collector, so the peer would never see it. Writing from the relay is what
+    // makes one entry visible to both sides — and it outlives the 6h TTL on
+    // GroupMessage, which is what History reads once the session is gone.
+    //
+    // Every persisted type is archived, notes included, so the History tab can
+    // replay the whole conversation and not just the shared traces.
+    //
+    // Never let a history failure lose an accepted message: the live feed has
+    // already been broadcast by this point.
+    try {
+      await recordHistory(groupCode, instanceId, type, null, summaryText);
+    } catch (err) {
+      console.error("recordHistory failed for", groupCode, err);
     }
 
     return res.status(201).json({ message: "message added", data: result.message });

@@ -200,3 +200,179 @@ export async function fetchInstanceId(apiBaseUrl?: string): Promise<string> {
   const data = (await res.json()) as { instance_id: string };
   return data.instance_id;
 }
+
+// ---- Group History ----
+//
+// Source of truth is the RELAY's shared `group_history` collection, not the
+// collector. The collector's copy is per-machine SQLite: a share written by a
+// peer's browser lands on that peer's disk and is invisible to everyone else.
+// The relay is a single shared store both peers write to and read from.
+
+/**
+ * A single persisted history row. Field names are snake_case because that is
+ * the wire shape the relay emits (kept identical to the collector's columns so
+ * the two stores stay interchangeable).
+ */
+export interface GroupHistoryRow {
+  id: string | number;
+  group_code: string;
+  instance_id: string;
+  entry_type: string;
+  trace_id: string | null;
+  data: string | null;
+  /** Epoch milliseconds. */
+  saved_at: number;
+}
+
+export interface GroupHistoryResponse {
+  group_code: string;
+  count: number;
+  entries: GroupHistoryRow[];
+}
+
+/**
+ * Read persisted group history from the relay. `types` maps to the server-side
+ * `?types=` allowlist filter.
+ */
+export async function getGroupHistory(
+  groupCode: string,
+  opts?: { types?: string[]; relayBaseUrl?: string }
+): Promise<GroupHistoryResponse> {
+  const q = opts?.types?.length ? `?types=${encodeURIComponent(opts.types.join(","))}` : "";
+  const base = opts?.relayBaseUrl ?? getRelayBase();
+  const url = `${base}/group/${encodeURIComponent(groupCode)}/history${q}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
+  }
+  return res.json() as Promise<GroupHistoryResponse>;
+}
+
+/** Summary of one group this instance has previously taken part in. */
+export interface GroupSummary {
+  group_code: string;
+  /** Epoch milliseconds. */
+  last_activity: number;
+  my_entries: number;
+  share_entries: number;
+  total_entries: number;
+}
+
+export interface GroupListResponse {
+  instance_id: string;
+  count: number;
+  groups: GroupSummary[];
+}
+
+/**
+ * Every group this instance has joined, most recently active first.
+ *
+ * Unlike the live feed (which the relay expires after 6h), this history has no
+ * TTL, so previously joined sessions stay reachable from the navbar archive.
+ */
+export async function listMyGroups(opts?: {
+  instanceId?: string;
+  relayBaseUrl?: string;
+}): Promise<GroupListResponse> {
+  const base = opts?.relayBaseUrl ?? getRelayBase();
+  const id = opts?.instanceId ?? getInstanceId();
+  const res = await fetch(`${base}/history/groups?instance_id=${encodeURIComponent(id)}`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
+  }
+  return res.json() as Promise<GroupListResponse>;
+}
+
+// ---- Collector mirror (best effort) ----
+//
+// The collector keeps a per-machine copy of history for local inspection. It is
+// explicitly NOT the source of truth and never gates the UI: these calls log
+// and swallow failures so a local-only collector can never break the relay feed.
+
+/**
+ * Mirror one entry into the collector's local group_history.
+ *
+ * Never throws, but no longer fails silently either: a non-2xx is logged with
+ * its status, because an unchecked `fetch` here previously discarded 404s and
+ * connection refusals alike and made a dead collector impossible to diagnose.
+ */
+export async function recordGroupHistory(
+  payload: {
+    group_code: string;
+    instance_id: string;
+    entry_type: string;
+    trace_id?: string | null;
+    data?: string | null;
+  },
+  opts?: { instanceId?: string; apiBaseUrl?: string }
+): Promise<void> {
+  try {
+    const url = apiUrl("/groups/data", opts?.apiBaseUrl);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: headers(opts?.instanceId),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      console.warn(
+        `[history] collector mirror rejected ${payload.entry_type} for ${payload.group_code}: HTTP ${res.status}`
+      );
+    }
+  } catch (err) {
+    console.warn(`[history] collector mirror unreachable for ${payload.group_code}:`, err);
+  }
+}
+
+/**
+ * Record that this instance entered a group.
+ *
+ * The relay is the real target: its shared history collection is what
+ * listMyGroups() reads, so skipping this leaves the navbar archive permanently
+ * empty. The collector gets a best-effort copy for local inspection.
+ *
+ * Never throws — neither call may break the relay page. Failures are logged
+ * rather than swallowed, because an unchecked fetch here previously discarded
+ * 404s and connection refusals alike.
+ */
+export async function markGroupJoined(
+  groupCode: string,
+  opts?: { instanceId?: string; apiBaseUrl?: string; relayBaseUrl?: string }
+): Promise<void> {
+  const instanceId = opts?.instanceId ?? getInstanceId();
+
+  // Relay first — this is the copy that matters.
+  try {
+    const base = opts?.relayBaseUrl ?? getRelayBase();
+    const res = await fetch(`${base}/group/${encodeURIComponent(groupCode)}/history`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ instanceId }),
+    });
+    if (!res.ok) {
+      console.warn(`[history] relay rejected join marker for ${groupCode}: HTTP ${res.status}`);
+    }
+  } catch (err) {
+    console.warn(`[history] relay unreachable for join marker ${groupCode}:`, err);
+  }
+
+  // Collector mirror.
+  try {
+    const url = apiUrl("/groups/history", opts?.apiBaseUrl);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: headers(instanceId),
+      body: JSON.stringify({
+        group_code: groupCode,
+        instance_id: instanceId,
+        entry_type: "joined",
+      }),
+    });
+    if (!res.ok) {
+      console.warn(`[history] collector mirror rejected join marker for ${groupCode}: HTTP ${res.status}`);
+    }
+  } catch (err) {
+    console.warn(`[history] collector mirror unreachable for ${groupCode}:`, err);
+  }
+}
