@@ -101,6 +101,34 @@ type RawTotalRow = {
 };
 
 /**
+ * Delete every archived entry for a group.
+ *
+ * Authorisation: the caller must already be a recorded participant in that
+ * group. This endpoint cannot fall back to the Group collection for membership
+ * because the group has usually expired by the time anyone wants to delete its
+ * history — and an expired group is precisely the case this endpoint serves.
+ *
+ * That fallback matters for safety, not just tidiness. Group codes are four
+ * characters and are shared out loud, and history reads are already
+ * unauthenticated, so a delete with no participant check would let anyone wipe
+ * any other team's archived conversation by guessing a code. Requiring a row
+ * that only a real participant could have written closes that off.
+ */
+export async function deleteHistoryForGroup(
+  groupCode: string,
+  instanceId: string,
+): Promise<{ ok: true; deleted: number } | { ok: false; reason: "not_a_participant" }> {
+  const participant = await groupHistoryModel.exists({ groupCode, instanceId });
+
+  if (!participant) {
+    return { ok: false, reason: "not_a_participant" };
+  }
+
+  const result = await groupHistoryModel.deleteMany({ groupCode });
+  return { ok: true, deleted: result.deletedCount ?? 0 };
+}
+
+/**
  * Every group this instance has ever been part of, most recently active first.
  *
  * Membership comes from the marker rows the dashboard writes on entry. Counts

@@ -1,62 +1,130 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
-/* ─── Design Tokens Inspired by logo.png ────────────────────────────────── */
+/* ─── Design Tokens — Neo-Brutalist Wireframe ───────────────────────────── */
 /*
-  Color story from the TS mark:
-    "T" = dark charcoal  → bg-surface, bg-page tones  (#0A0D14 … #1D2235)
-    "S" = vivid violet   → accent (#6C47FF)
-    Geometry: parallelograms, angular skews, bold geometric overlaps
+  Color story:
+    "paper"  = warm off-white cream ground (#FAF8F5) with a faint blueprint grid
+    "ink"    = near-black (#0A0A0C) used for EVERY border, headline and shadow
+    "violet" = brand accent (#6C47FF), "flare" = high-energy secondary (#FF4D00)
+  Geometry: thick 2px ink outlines, hard offset shadows (never blurred),
+            pill / oversized radii, sticker-like overlapping elements.
+  Contrast: all text tokens verified >= 4.5:1 against --bg-page.
+
+  THEMING CONTRACT — read before touching any color below.
+  Every color in the app resolves through these tokens; nothing may hardcode a
+  hex. `:root` defines the light "paper" theme and `:root.dark` below overrides
+  *the same token names* for the dark theme. A token therefore has ONE semantic
+  job ("this is a filled accent surface") that survives a theme flip, which is
+  what keeps the UI from contradicting itself when the toggle is used.
+
+  Two token families exist on purpose:
+    --accent / --flare / --green ...  = the *mark*. Fills, dots, bars, borders.
+    --*-text / --*-bg                  = text and tint pairings that are
+                                          contrast-checked together, because a
+                                          pale tint drags its text down with it.
+    --on-accent / --on-flare           = what sits ON a saturated fill. Light
+                                          theme needs white; dark theme inverts
+                                          to ink so the neon fills keep 4.5:1.
 */
 :root {
-  --bg-page:        #0a0a0c;
-  --bg-surface:     #121216;
-  --bg-surface-2:   #16161a;
-  --bg-surface-3:   #1c1c21;
+  color-scheme: light;
 
-  --border:         rgba(255, 255, 255, 0.06);
-  --border-dim:     rgba(255, 255, 255, 0.04);
-  --border-accent:  rgba(108, 71, 255, 0.35);
+  --bg-page:        #faf8f5;
+  --bg-surface:     #ffffff;
+  --bg-surface-2:   #f2efe9;
+  --bg-surface-3:   #e7e3da;
+
+  /* Sticky nav needs a translucent ground; kept as a token so the scrim
+     matches the active theme instead of staying stubbornly dark. */
+  --bg-nav:         rgba(250, 248, 245, 0.86);
+  --bg-scrim:       rgba(10, 10, 12, 0.55);
+  --bg-code:        #f2efe9;
+  --bg-glass:       rgba(250, 248, 245, 0.85);
+
+  --border:         #0a0a0c;
+  --border-dim:     rgba(10, 10, 12, 0.22);
+  --border-accent:  #0a0a0c;
+
+  /* Blueprint grid lines — the "wireframe plane" */
+  --grid-line:      rgba(10, 10, 12, 0.055);
+  --grid-line-lg:   rgba(10, 10, 12, 0.07);
 
   --accent:         #6C47FF;
-  --accent-light:   rgba(108, 71, 255, 0.12);
-  --accent-hover:   #7E5BFF;
-  --accent-text:    #A78BFA;
+  --accent-light:   #EFEAFE;
+  --accent-hover:   #5936E8;
+  --accent-text:    #5B34E8;
+  --accent-grad-2:  #9B6DFF;
   --accent-glow:    rgba(108, 71, 255, 0.35);
 
-  --text-primary:   #F8FAFC;
-  --text-secondary: #94A3B8;
-  --text-dim:       #64748B;
+  --flare:          #FF4D00;
+  --flare-light:    #FFE9DF;
+  /* Deep flare: white text on this passes 4.5:1, unlike --flare */
+  --flare-deep:     #C43A00;
+  /* Gradient end-cap for capsules — keeps white label text at 4.5:1 */
+  --flare-deep-grad:#D93A00;
+  --flare-hover:    #A83200;
 
-  /* Status Accents */
-  --green:          #10B981;
-  --green-bg:       rgba(16, 185, 129, 0.12);
-  --green-border:   rgba(16, 185, 129, 0.28);
+  /* Text that sits on top of a saturated fill. These read as four tokens but
+     share a value per theme: white on the dark marks of the light theme, ink
+     on the bright marks of the dark theme. Separate names keep call sites
+     honest about what they are painted on. */
+  --on-accent:      #ffffff;
+  --on-flare:       #ffffff;
+  --on-red:         #ffffff;
+  --on-green:       #ffffff;
+  /* For fills whose color is chosen at runtime (stage tones, comparison bars) */
+  --on-status:      #ffffff;
 
-  --blue:           #38BDF8;
-  --blue-bg:        rgba(56, 189, 248, 0.12);
-  --blue-border:    rgba(56, 189, 248, 0.28);
+  --text-primary:   #0A0A0C;
+  --text-secondary: #45454E;
+  --text-dim:       #63636D;
 
-  --amber:          #F59E0B;
-  --amber-bg:       rgba(245, 158, 11, 0.12);
-  --amber-border:   rgba(245, 158, 11, 0.28);
+  /* Status Accents — dark enough for 4.5:1 on cream, punchy enough to pop */
+  --green:          #0F7A3D;
+  --green-bg:       #E3F5EA;
+  --green-border:   #0F7A3D;
+  /* Text-on-tint variants: the pale *-bg fills drop contrast, so text darkens */
+  --green-text:     #0B5C2D;
 
-  --red:            #F43F5E;
-  --red-bg:         rgba(244, 63, 94, 0.12);
-  --red-border:     rgba(244, 63, 94, 0.28);
+  --blue:           #1D4ED8;
+  --blue-bg:        #E3EAFD;
+  --blue-border:    #1D4ED8;
+  --blue-text:      #1739A8;
 
-  --shadow-sm:      0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-md:      0 4px 16px rgba(0, 0, 0, 0.5);
-  --shadow-card:    0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05);
-  --shadow-glow:    0 0 25px -4px rgba(108, 71, 255, 0.35);
+  --amber:          #B45309;
+  --amber-bg:       #FCEFDC;
+  --amber-border:   #B45309;
+  --amber-text:     #92400E;
 
-  /* ── Radii ── */
-  --radius-xs:      5px;
-  --radius-sm:      7px;
-  --radius:         9px;
-  --radius-md:      12px;
-  --radius-lg:      16px;
+  --red:            #DC2626;
+  --red-bg:         #FCE7E7;
+  --red-border:     #DC2626;
+  --red-text:       #B91C1C;
+
+  /* "Live" pulse dot on the collector status chip */
+  --live:           #10B981;
+
+  /* Hard offset shadows — the signature brutalist "sticker" depth */
+  --shadow-sm:      2px 2px 0 var(--border);
+  --shadow-md:      4px 4px 0 var(--border);
+  --shadow-card:    3px 3px 0 var(--border);
+  --shadow-glow:    6px 6px 0 var(--border);
+  /* Soft ambient depth for overlays only. Stays dark in both themes: a shadow
+     that lightened with the theme would stop reading as depth. */
+  --shadow-scrim:   rgba(0, 0, 0, 0.8);
+  --red-glow:       rgba(220, 38, 38, 0.12);
+
+  /* ── Radii: pills and soft-oversized only ── */
+  --radius-xs:      6px;
+  --radius-sm:      10px;
+  --radius:         14px;
+  --radius-md:      18px;
+  --radius-lg:      26px;
   --radius-full:    9999px;
+
+  /* ── Stroke weight: the single border width for the whole system ── */
+  --stroke:         2px;
 
   /* ── Spacing rhythm ── */
   --gap-xs:         4px;
@@ -80,6 +148,95 @@
   --z-modal:        60;
 }
 
+/* ─── Dark Theme — "Midnight Blueprint" ────────────────────────────────── */
+/*
+  Not an inversion: the paper becomes deep slate and the ink becomes chalk, so
+  the brutalist contract (bright outline + hard offset shadow on every surface)
+  survives intact instead of turning into low-contrast mush. Only the ground
+  polarity flips; geometry, radii and stroke weight are untouched.
+
+  Every token used by a component is re-declared here. A token that is NOT
+  overridden is a bug — it would silently keep its light value and produce the
+  "half-switched" contradiction this theme exists to prevent.
+*/
+:root.dark {
+  color-scheme: dark;
+
+  /* Grounds: a graded stack so nested panels stay separable */
+  --bg-page:        #0b0b11;
+  --bg-surface:     #15151d;
+  --bg-surface-2:   #1d1d27;
+  --bg-surface-3:   #282834;
+
+  --bg-nav:         rgba(11, 11, 17, 0.82);
+  --bg-scrim:       rgba(0, 0, 0, 0.7);
+  --bg-code:        #101018;
+  --bg-glass:       rgba(21, 21, 29, 0.78);
+
+  /* "Ink" inverts to chalk. Because --border also feeds every hard shadow,
+     flipping this one token re-lights the whole shadow system automatically. */
+  --border:         #ededf2;
+  --border-dim:     rgba(237, 237, 242, 0.24);
+  --border-accent:  #ededf2;
+
+  --grid-line:      rgba(237, 237, 242, 0.06);
+  --grid-line-lg:   rgba(237, 237, 242, 0.09);
+
+  /* Accents brighten so they stay legible on a dark ground; text-on-fill
+     inverts to ink, which is what makes the neon fills read as "high energy"
+     rather than as glowing mud. */
+  --accent:         #a288ff;
+  --accent-light:   #241c4d;
+  --accent-hover:   #b9a2ff;
+  --accent-text:    #b9a2ff;
+  --accent-grad-2:  #7a5cff;
+  --accent-glow:    rgba(162, 136, 255, 0.4);
+
+  --flare:          #ff6a2b;
+  --flare-light:    #3a1a0c;
+  --flare-deep:     #ff8a4d;
+  --flare-deep-grad:#ff5a1f;
+  --flare-hover:    #ffa173;
+
+  --on-accent:      #0b0b11;
+  --on-flare:       #0b0b11;
+  --on-red:         #0b0b11;
+  --on-green:       #0b0b11;
+  --on-status:      #0b0b11;
+
+  --text-primary:   #f2f1f5;
+  --text-secondary: #b4b3be;
+  --text-dim:       #8b8a96;
+
+  --green:          #34d399;
+  --green-bg:       #0d2b1f;
+  --green-border:   #34d399;
+  --green-text:     #6ee7b7;
+
+  --blue:           #60a5fa;
+  --blue-bg:        #10233f;
+  --blue-border:    #60a5fa;
+  --blue-text:      #93c5fd;
+
+  --amber:          #fbbf24;
+  --amber-bg:       #33240a;
+  --amber-border:   #fbbf24;
+  --amber-text:     #fcd34d;
+
+  --red:            #f87171;
+  --red-bg:         #3a1416;
+  --red-border:     #f87171;
+  --red-text:       #fca5a5;
+
+  --live:           #34d399;
+
+  --shadow-scrim:   rgba(0, 0, 0, 0.8);
+  --red-glow:       rgba(248, 113, 113, 0.16);
+}
+
+/* Make Tailwind's `dark:` utilities follow the in-app toggle instead of the OS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ─── Reset & Base ─────────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -89,7 +246,6 @@ html, body, #root {
   height: 100%;
   background: var(--bg-page);
   color: var(--text-primary);
-  color-scheme: dark;
 }
 
 body {
@@ -102,28 +258,48 @@ body {
   overflow-x: hidden;
 }
 
+/* Blueprint grid ground — subtle wireframe plane behind every surface */
+.bg-grid {
+  background-color: var(--bg-page);
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: center center;
+}
+
+/* Larger, more emphatic grid for hero/section stages */
+.bg-grid-lg {
+  background-color: var(--bg-page);
+  background-image:
+    linear-gradient(to right, var(--grid-line-lg) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line-lg) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
 /* ─── Scrollbars ───────────────────────────────────────────────────────── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(108, 71, 255, 0.3) transparent;
+  scrollbar-color: var(--border) transparent;
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--bg-surface-2);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(108, 71, 255, 0.25);
+  background: var(--border);
   border-radius: 9999px;
+  border: 2px solid var(--bg-surface-2);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(108, 71, 255, 0.5);
+  background: var(--accent);
 }
 
 /* ─── Animations ───────────────────────────────────────────────────────── */
@@ -156,11 +332,25 @@ body {
 
 @keyframes pulseGlow {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(108, 71, 255, 0.2);
+    box-shadow: var(--shadow-sm);
   }
   50% {
-    box-shadow: 0 0 30px rgba(108, 71, 255, 0.5);
+    box-shadow: var(--shadow-md);
   }
+}
+
+@keyframes bracketPulse {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes dotBlink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(0.82); }
 }
 
 @keyframes radarPing {
@@ -187,6 +377,20 @@ body {
   }
 }
 
+/* ─── Component Primitives ─────────────────────────────────────────────── */
+/*
+  Everything from here down lives in `@layer components`.
+
+  This is load-bearing, not cosmetic: Tailwind v4 emits its utilities inside
+  `@layer utilities`, and *unlayered* rules beat any layered rule regardless of
+  source order. So an unlayered `.btn-secondary { display: inline-flex }` would
+  silently defeat every `hidden` / `sm:flex` / `lg:flex` utility that shares the
+  element — which is exactly how the console toolbar used to overflow on phones.
+  Declaring these as components restores the intended precedence: components
+  are the base look, utilities win on top.
+*/
+@layer components {
+
 /* ─── Custom Classes ──────────────────────────────────────────────────── */
 .fade-up {
   animation: fadeUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -212,82 +416,107 @@ body {
 }
 
 .glow-violet {
-  box-shadow: 0 0 25px -4px rgba(108, 71, 255, 0.45);
+  box-shadow: var(--shadow-md);
 }
 
 .glow-violet-sm {
-  box-shadow: 0 0 12px -2px rgba(108, 71, 255, 0.35);
+  box-shadow: var(--shadow-sm);
 }
 
 .border-glow-hover {
-  transition: all 0.2s ease;
+  transition: transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 .border-glow-hover:hover {
-  border-color: rgba(108, 71, 255, 0.5);
-  box-shadow: 0 0 20px -3px rgba(108, 71, 255, 0.25);
+  box-shadow: var(--shadow-md);
+  transform: translate(-2px, -2px);
 }
 
 .glass-panel {
-  background: rgba(17, 20, 32, 0.75);
+  background: var(--bg-glass);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: var(--stroke) solid var(--border);
 }
 
 .gradient-text-hero {
-  background: linear-gradient(135deg, #FFFFFF 20%, #C4B5FD 60%, #818CF8 100%);
+  background: linear-gradient(105deg, var(--accent) 0%, var(--flare) 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .gradient-text-accent {
-  background: linear-gradient(135deg, #A78BFA 0%, #6C47FF 60%, #4F2BE3 100%);
+  background: linear-gradient(105deg, var(--accent) 0%, var(--accent-grad-2) 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-/* Background Cyber Grid */
+/* Dual-tone gradient capsule used inside hero headlines */
+/* Dual-tone gradient capsule used inside hero headlines */
+.nb-capsule {
+  display: inline-block;
+  padding: 2px 18px;
+  border-radius: var(--radius-full);
+  border: var(--stroke) solid var(--border);
+  background: linear-gradient(105deg, var(--accent) 0%, var(--flare-deep-grad) 100%);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+}
+
+.capsule-gradient {
+  background: linear-gradient(105deg, var(--accent) 0%, var(--flare-deep-grad) 100%);
+  color: var(--on-accent);
+  border: var(--stroke) solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Backwards-compatible alias — now the light blueprint grid */
 .bg-grid-cyber {
   background-size: 32px 32px;
-  background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
 }
 
 /* Select styling override */
 select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' stroke='%2394A3B8' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' stroke='%230A0A0C' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
   padding-right: 28px !important;
 }
 
 /* ─── Standard Buttons & Badges ────────────────────────────────────────── */
+/* Brutalist press: hover lifts the sticker off the page, active slams it down */
 .btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   background: var(--accent);
-  color: #ffffff;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 6px 14px;
+  color: var(--on-accent);
+  border: var(--stroke) solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 7px 16px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s ease;
-  box-shadow: 0 0 16px rgba(108, 71, 255, 0.35);
+  transition: all var(--dur-fast) var(--ease-out);
+  box-shadow: var(--shadow-sm);
 }
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
-  box-shadow: 0 0 22px rgba(108, 71, 255, 0.5);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
 }
 .btn-primary:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
-  box-shadow: none;
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-secondary {
@@ -295,19 +524,21 @@ select {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: var(--bg-surface-2);
+  background: var(--bg-surface);
   color: var(--text-primary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 13px;
+  border: var(--stroke) solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 7px 15px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--dur-fast) var(--ease-out);
+  box-shadow: var(--shadow-sm);
 }
-.btn-secondary:hover {
-  background: var(--bg-surface-3);
-  border-color: rgba(255, 255, 255, 0.12);
+.btn-secondary:hover:not(:disabled) {
+  background: var(--accent-light);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
 }
 .btn-secondary:disabled {
   opacity: 0.45;
@@ -320,21 +551,24 @@ select {
   justify-content: center;
   gap: 6px;
   background: var(--red-bg);
-  color: #F87171;
-  border: 1px solid var(--red-border);
-  border-radius: 8px;
-  padding: 6px 13px;
+  color: var(--red);
+  border: var(--stroke) solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 7px 15px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--dur-fast) var(--ease-out);
+  box-shadow: var(--shadow-sm);
 }
-.btn-destructive:hover {
-  background: rgba(244, 63, 94, 0.2);
-  border-color: rgba(244, 63, 94, 0.4);
+.btn-destructive:hover:not(:disabled) {
+  background: var(--red);
+  color: var(--on-red);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
 }
 .btn-destructive:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -342,12 +576,14 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 9px;
-  border-radius: 9999px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.02em;
-  border: 1px solid transparent;
+  border: var(--stroke) solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
 }
 
 /* ─── TS Logo-Inspired Geometric Design System ──────────────────────────── */
@@ -388,34 +624,35 @@ select {
 }
 
 .badge-angular-accent {
-  background: rgba(108, 71, 255, 0.2);
-  color: #A78BFA;
+  background: var(--accent);
+  color: var(--on-accent);
   border: none;
 }
 
 .badge-angular-green {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10B981;
+  background: var(--green-bg);
+  color: var(--green);
 }
 
 .badge-angular-red {
-  background: rgba(244, 63, 94, 0.15);
-  color: #F43F5E;
+  background: var(--red-bg);
+  color: var(--red);
 }
 
 .badge-angular-amber {
-  background: rgba(245, 158, 11, 0.15);
-  color: #F59E0B;
+  background: var(--amber-bg);
+  color: var(--amber);
 }
 
-/* Geometric card with angled top-right corner (like S-curve cut) */
+/* Geometric card with thick ink outline and hard offset shadow */
 .card-geometric {
   position: relative;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
-  border: 1px solid var(--border);
+  border: var(--stroke) solid var(--border);
   overflow: hidden;
-  transition: all 0.2s ease;
+  transition: transform var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
 }
 .card-geometric::after {
   content: "";
@@ -423,9 +660,8 @@ select {
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--accent) 0%, #9B6DFF 50%, transparent 100%);
-  border-radius: 10px 10px 0 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--flare) 100%);
 }
 
 /* Animated accent scan-line — like tracing a path */
@@ -453,7 +689,7 @@ select {
   pointer-events: none;
 }
 
-/* Sidebar logo accent — sharp left border like T stem */
+/* Sidebar logo accent — solid ink bar like T stem */
 .ts-nav-active {
   position: relative;
 }
@@ -461,27 +697,24 @@ select {
   content: "";
   position: absolute;
   left: -1px;
-  top: 15%;
-  bottom: 15%;
-  width: 3px;
-  border-radius: 0 2px 2px 0;
+  top: 18%;
+  bottom: 18%;
+  width: 4px;
+  border-radius: 0 3px 3px 0;
   background: var(--accent);
-  box-shadow: 0 0 8px rgba(108, 71, 255, 0.6);
 }
 
 /* Skewed section divider — parallelogram like T's top bar */
 .ts-divider {
   position: relative;
-  height: 2px;
+  height: 3px;
   background: linear-gradient(
     90deg,
-    transparent 0%,
-    var(--accent) 20%,
-    rgba(108, 71, 255, 0.4) 80%,
-    transparent 100%
+    var(--accent) 0%,
+    var(--flare) 60%,
+    var(--accent) 100%
   );
   margin: 0;
-  transform: skewX(-8deg);
 }
 
 /* Angular accent corner decoration — top-right geometric cut */
@@ -502,17 +735,19 @@ select {
 
 /* TS mark watermark for empty states */
 .ts-watermark {
-  opacity: 0.04;
+  opacity: 0.08;
   pointer-events: none;
   user-select: none;
 }
 
 /* Stat card accent pulse on hover */
 .stat-card-hover {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 .stat-card-hover:hover {
-  transform: translateY(-2px);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
 }
 
 /* Bold geometric heading underline using accent */
@@ -523,12 +758,12 @@ select {
 .heading-geo::after {
   content: "";
   position: absolute;
-  bottom: -4px;
+  bottom: -6px;
   left: 0;
   width: 100%;
-  height: 2px;
-  background: linear-gradient(90deg, var(--accent), transparent);
-  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 100%, 8px 100%);
+  height: 5px;
+  background: linear-gradient(90deg, var(--accent), var(--flare));
+  border-radius: 3px;
 }
 
 /* Logo-mark size token for the sidebar TS badge */
@@ -536,16 +771,17 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  background: #121624;
-  border: 1px solid rgba(108, 71, 255, 0.45);
-  box-shadow: 0 0 14px rgba(108, 71, 255, 0.3), inset 0 1px 0 rgba(255,255,255,0.05);
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  border: var(--stroke) solid var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
   overflow: hidden;
 }
 .ts-icon-badge:hover {
-  box-shadow: 0 0 20px rgba(108, 71, 255, 0.5);
-  border-color: rgba(108, 71, 255, 0.7);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -555,7 +791,8 @@ select {
 
 /* ─── Focus visibility ─────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid var(--accent-text);
+  outline: 3px solid var(--accent);
+  outline-color: var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius-xs);
 }
@@ -565,14 +802,14 @@ select {
 .ts-focus-inset:focus-visible {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-light);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ─── Form primitives ──────────────────────────────────────────────────── */
 .ts-label {
   display: block;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -586,19 +823,20 @@ select {
   font-family: inherit;
   font-size: 13px;
   color: var(--text-primary);
-  background: var(--bg-surface-2);
-  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  border: var(--stroke) solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 0 11px;
-  height: 34px;
+  padding: 0 12px;
+  height: 36px;
   outline: none;
-  transition: border-color var(--dur-fast) var(--ease-out),
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur-fast) var(--ease-out),
     box-shadow var(--dur-fast) var(--ease-out),
     background var(--dur-fast) var(--ease-out);
 }
 .ts-textarea {
   height: auto;
-  padding: 9px 11px;
+  padding: 10px 12px;
   line-height: 1.55;
   resize: vertical;
 }
@@ -606,17 +844,18 @@ select {
 .ts-textarea::placeholder {
   color: var(--text-dim);
 }
-.ts-input:hover,
-.ts-select:hover,
-.ts-textarea:hover {
-  border-color: rgba(255, 255, 255, 0.11);
+.ts-input:hover:not(:disabled),
+.ts-select:hover:not(:disabled),
+.ts-textarea:hover:not(:disabled) {
+  box-shadow: var(--shadow-md);
+  transform: translate(-1px, -1px);
 }
 .ts-input:focus,
 .ts-select:focus,
 .ts-textarea:focus {
   border-color: var(--accent);
   background: var(--bg-surface);
-  box-shadow: 0 0 0 3px var(--accent-light);
+  box-shadow: var(--shadow-md);
 }
 .ts-input:disabled,
 .ts-select:disabled,
@@ -647,7 +886,8 @@ select {
 .btn-secondary:active:not(:disabled),
 .btn-destructive:active:not(:disabled),
 .btn-ghost:active:not(:disabled) {
-  transform: scale(0.975);
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--border);
 }
 
 .btn-ghost {
@@ -657,37 +897,36 @@ select {
   gap: 6px;
   background: transparent;
   color: var(--text-secondary);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  padding: 6px 10px;
+  border: var(--stroke) solid transparent;
+  border-radius: var(--radius-full);
+  padding: 6px 12px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
 }
-.btn-ghost:hover {
+.btn-ghost:hover:not(:disabled) {
   background: var(--bg-surface-2);
   color: var(--text-primary);
+  border-color: var(--border);
 }
 
 /* ─── Card / Panel ─────────────────────────────────────────────────────── */
 .ts-card {
   position: relative;
   background: var(--bg-surface);
-  border: 1px solid var(--border);
+  border: var(--stroke) solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
   overflow: hidden;
-  transition: border-color var(--dur) var(--ease-out),
-    box-shadow var(--dur) var(--ease-out),
-    transform var(--dur) var(--ease-out);
+  transition: transform var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
 }
 .ts-card-interactive {
   cursor: pointer;
 }
 .ts-card-interactive:hover {
-  border-color: var(--border-accent);
-  box-shadow: var(--shadow-md), 0 0 24px -8px rgba(108, 71, 255, 0.35);
-  transform: translateY(-1px);
+  transform: translate(-3px, -3px);
+  box-shadow: 6px 6px 0 var(--border);
 }
 
 .ts-card-header {
@@ -697,11 +936,11 @@ select {
   gap: var(--gap);
   padding: 12px 16px;
   background: var(--bg-surface-2);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--stroke) solid var(--border);
 }
 .ts-card-title {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.005em;
 }
@@ -717,7 +956,7 @@ select {
 /* ─── Section overline (eyebrow label) ─────────────────────────────────── */
 .ts-overline {
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -731,16 +970,16 @@ select {
   gap: var(--gap-sm);
   padding: 10px 12px;
   background: var(--bg-surface-2);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--stroke) solid var(--border);
 }
 .ts-toolbar-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--gap-sm);
-  padding: 6px 12px;
+  padding: 8px 12px;
   background: var(--bg-surface-2);
-  border-top: 1px solid var(--border);
+  border-top: var(--stroke) solid var(--border);
 }
 
 /* ─── Tables ───────────────────────────────────────────────────────────── */
@@ -761,13 +1000,13 @@ select {
   padding: 9px 14px;
   text-align: left;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--text-dim);
+  color: var(--text-primary);
   white-space: nowrap;
   background: var(--bg-surface-2);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--stroke) solid var(--border);
 }
 .ts-table thead th:first-child {
   padding-left: 16px;
@@ -787,7 +1026,7 @@ select {
   transition: background var(--dur-fast) var(--ease-out);
 }
 .ts-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.022);
+  background: var(--accent-light);
 }
 .ts-table tbody tr:last-child td {
   border-bottom: none;
@@ -796,7 +1035,7 @@ select {
   cursor: pointer;
 }
 .ts-table-clickable tbody tr:hover {
-  background: rgba(108, 71, 255, 0.055);
+  background: var(--accent-light);
 }
 
 /* Sortable column header button */
@@ -811,12 +1050,12 @@ select {
   font: inherit;
   letter-spacing: inherit;
   text-transform: inherit;
-  color: var(--text-dim);
+  color: var(--text-primary);
   cursor: pointer;
   transition: color var(--dur-fast) var(--ease-out);
 }
 .ts-sort:hover {
-  color: var(--text-primary);
+  color: var(--accent-text);
 }
 .ts-sort[data-active="true"] {
   color: var(--accent-text);
@@ -838,18 +1077,18 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 8px;
+  padding: 2px 9px;
   border-radius: var(--radius-full);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.5;
   white-space: nowrap;
-  border: 1px solid transparent;
+  border: var(--stroke) solid var(--border);
 }
 .ts-chip-accent {
   color: var(--accent-text);
   background: var(--accent-light);
-  border-color: var(--border-accent);
+  border-color: var(--border);
 }
 .ts-chip-neutral {
   color: var(--text-secondary);
@@ -859,10 +1098,10 @@ select {
 .ts-kbd {
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 10px;
-  padding: 1px 5px;
+  padding: 1px 6px;
   border-radius: var(--radius-xs);
-  color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+  background: var(--bg-surface-2);
   border: 1px solid var(--border);
 }
 .ts-code {
@@ -871,7 +1110,7 @@ select {
   padding: 1px 6px;
   border-radius: var(--radius-xs);
   color: var(--accent-text);
-  background: var(--bg-surface-2);
+  background: var(--accent-light);
   border: 1px solid var(--border-dim);
 }
 
@@ -883,42 +1122,39 @@ select {
   padding: 14px 16px;
   border-radius: var(--radius-md);
   background: var(--bg-surface);
-  border: 1px solid var(--border);
+  border: var(--stroke) solid var(--border);
   overflow: hidden;
   transition: transform var(--dur) var(--ease-out),
-    border-color var(--dur) var(--ease-out),
     box-shadow var(--dur) var(--ease-out);
 }
 .ts-stat::before {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
-  height: 2px;
+  height: 4px;
   background: var(--accent);
-  opacity: 0.85;
 }
 .ts-stat[data-accent="green"]::before { background: var(--green); }
 .ts-stat[data-accent="red"]::before   { background: var(--red); }
 .ts-stat[data-accent="amber"]::before { background: var(--amber); }
 .ts-stat[data-accent="blue"]::before   { background: var(--blue); }
 .ts-stat:hover {
-  transform: translateY(-2px);
-  border-color: var(--border-accent);
+  transform: translate(-3px, -3px);
   box-shadow: var(--shadow-md);
 }
 .ts-stat-label {
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-dim);
 }
 .ts-stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
   color: var(--text-primary);
-  line-height: 1.15;
+  line-height: 1.1;
   margin-top: 4px;
   font-variant-numeric: tabular-nums;
 }
@@ -938,7 +1174,7 @@ select {
   to   { opacity: 1; transform: none; }
 }
 @keyframes rowFlash {
-  0%   { background-color: rgba(108, 71, 255, 0.22); }
+  0%   { background-color: var(--accent-light); }
   100% { background-color: transparent; }
 }
 @keyframes popIn {
@@ -1008,57 +1244,60 @@ select {
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   font-size: 13px;
+  font-weight: 500;
   text-decoration: none;
   color: var(--text-secondary);
-  border: 1px solid transparent;
+  border: var(--stroke) solid transparent;
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease-out),
     color var(--dur-fast) var(--ease-out),
-    border-color var(--dur-fast) var(--ease-out);
+    border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
 }
 .ts-nav-link:hover {
-  background: var(--bg-surface-2);
+  background: var(--bg-surface);
   color: var(--text-primary);
+  border-color: var(--border);
 }
 .ts-nav-link[data-active="true"] {
   color: var(--text-primary);
-  font-weight: 600;
-  background: rgba(108, 71, 255, 0.14);
-  border-color: rgba(108, 71, 255, 0.35);
+  font-weight: 700;
+  background: var(--accent);
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
 }
 .ts-nav-link::before {
   content: "";
   position: absolute;
   left: -1px;
   top: 50%;
-  width: 3px;
+  width: 4px;
   height: 0;
-  border-radius: 0 2px 2px 0;
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
+  border-radius: 0 3px 3px 0;
+  background: var(--flare);
   transform: translateY(-50%);
   transition: height var(--dur) var(--ease-out);
 }
 .ts-nav-link[data-active="true"]::before {
-  height: 55%;
+  display: none;
 }
 
 /* ─── Segmented control ────────────────────────────────────────────────── */
 .ts-segmented {
   display: inline-flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: var(--radius-sm);
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-full);
   background: var(--bg-surface-2);
-  border: 1px solid var(--border);
+  border: var(--stroke) solid var(--border);
 }
 .ts-segment {
-  padding: 4px 10px;
-  border-radius: var(--radius-xs);
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
   color: var(--text-dim);
   background: transparent;
@@ -1072,10 +1311,9 @@ select {
   color: var(--text-primary);
 }
 .ts-segment[aria-checked="true"] {
-  color: #DDD6FE;
-  background: var(--accent-light);
-  border-color: var(--border-accent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--border);
 }
 
 /* ─── Utility ──────────────────────────────────────────────────────────── */
@@ -1099,6 +1337,302 @@ select {
   white-space: nowrap;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   NEO-BRUTALIST WIREFRAME LAYER
+   Landing-page primitives: outlined pills, bracket frames, offset panels,
+   sticker chips and hard-shadow cards. Every rule is a *black outline +
+   offset shadow* construction — no blurs, no gradients on the surface.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Thick outlined pill — the workhorse capsule of the landing page */
+.nb-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: var(--radius-full);
+  border: var(--stroke) solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+a.nb-pill,
+button.nb-pill {
+  cursor: pointer;
+}
+.nb-pill:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
+}
+.nb-pill:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--border);
+}
+
+/* Solid ink pill for the primary CTA */
+.nb-pill-solid {
+  background: var(--text-primary);
+  color: var(--bg-page);
+}
+.nb-pill-solid:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Accent-filled pill */
+.nb-pill-accent {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.nb-pill-accent:hover {
+  background: var(--accent-hover);
+}
+
+/* Flare-filled pill — the high-energy secondary */
+.nb-pill-flare {
+  background: var(--flare-deep);
+  color: var(--on-flare);
+}
+.nb-pill-flare:hover {
+  background: var(--flare-hover);
+}
+
+/* Status dot indicators used inside chips and pills */
+.nb-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--border);
+  flex-shrink: 0;
+}
+.nb-dot-live {
+  background: var(--green);
+  animation: dotBlink 1.8s ease-in-out infinite;
+}
+.nb-dot-accent { background: var(--accent); }
+.nb-dot-flare  { background: var(--flare); }
+.nb-dot-ink    { background: var(--text-primary); }
+.nb-dot-green  { background: var(--green); }
+.nb-dot-amber  { background: var(--amber); }
+.nb-dot-red    { background: var(--red); }
+.nb-dot-blue   { background: var(--blue); }
+
+/* Outlined text badge chip with a leading bullet */
+.nb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 13px;
+  border-radius: var(--radius-full);
+  border: var(--stroke) solid var(--border);
+  background: var(--bg-surface);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.nb-chip:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Word encapsulated inside a pill, used inside large headings */
+.nb-word {
+  display: inline-block;
+  padding: 2px 16px;
+  border-radius: var(--radius-full);
+  border: var(--stroke) solid var(--border);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+}
+
+/* Oversized curly brace that frames the hero headline */
+.nb-brace {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 0.8;
+  user-select: none;
+  animation: bracketPulse 5s ease-in-out infinite;
+}
+
+/* Hero / section frame: thick ink border with a hard shadow */
+.nb-frame {
+  position: relative;
+  border: var(--stroke) solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-glow);
+}
+
+/* Rounded image showcase card with thick border */
+.nb-showcase {
+  position: relative;
+  border: var(--stroke) solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  overflow: hidden;
+  box-shadow: var(--shadow-glow);
+}
+
+/* Offset accent backdrop panel — pure offset, no blur */
+.nb-panel {
+  position: absolute;
+  border: var(--stroke) solid var(--border);
+  border-radius: var(--radius-lg);
+  z-index: 0;
+}
+
+/* Floating sticker element that overlaps section edges */
+.nb-sticker {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-full);
+  border: var(--stroke) solid var(--border);
+  background: var(--bg-surface);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+  z-index: 20;
+  animation: floatSlow 4.5s ease-in-out infinite;
+}
+
+/* Stat pill: number metric with an outline and a colored dot */
+.nb-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  border: var(--stroke) solid var(--border);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.nb-stat:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: var(--shadow-md);
+}
+.nb-stat-value {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.nb-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* Numbered feature / loop card */
+.nb-card {
+  position: relative;
+  padding: 22px;
+  border-radius: var(--radius-md);
+  border: var(--stroke) solid var(--border);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+}
+.nb-card:hover {
+  transform: translate(-4px, -4px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Index numeral rendered as a sticker square */
+.nb-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-sm);
+  border: var(--stroke) solid var(--border);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 16px;
+  font-weight: 800;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Keyword row separated by centered dots */
+.nb-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+.nb-dot-sep {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--flare);
+  border: 1.5px solid var(--border);
+}
+
+/* Terminal / code block with ink frame */
+.nb-code {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: var(--stroke) solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  overflow-x: auto;
+}
+
+/* Chat bubble — outline construction, offset shadow on the sender's side */
+.nb-bubble {
+  position: relative;
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: var(--stroke) solid var(--border);
+  background: var(--bg-surface);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+.nb-bubble-in {
+  background: var(--accent-light);
+}
+.nb-bubble-flare {
+  background: var(--flare-light);
+}
+
 /* ─── Reduced motion ───────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -1120,15 +1654,45 @@ select {
   .ts-toast,
   .fade-up,
   .stat-in,
-  .animate-float {
+  .animate-float,
+  .nb-sticker,
+  .nb-brace,
+  .nb-dot-live {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
   }
+  .nb-pill:hover,
+  .nb-chip:hover,
+  .nb-stat:hover,
+  .nb-card:hover,
+  .nb-pill:active,
   .ts-stat:hover,
-  .ts-card-interactive:hover {
+  .ts-card-interactive:hover,
+  .stat-card-hover:hover,
+  .border-glow-hover:hover,
+  .ts-input:hover,
+  .ts-select:hover,
+  .ts-textarea:hover,
+  .ts-icon-badge:hover {
     transform: none !important;
+    box-shadow: var(--shadow-sm) !important;
   }
 }
+
+/* ─── Uniform keyboard focus ring ──────────────────────────────────────────
+   Sits last in the layer so it outranks each primitive's own `outline`
+   declaration. Without this, pills and chips that draw their outline with
+   `currentColor` hand back a grey ring on keyboard focus, so the brand-violet
+   ring only appeared on some elements. Deliberately NOT applied to
+   `.ts-focus-inset`, which keeps its inset border treatment (higher
+   specificity), and still overridable by an explicit Tailwind
+   `focus:outline-none`, since utilities outrank components. */
+:is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+} /* end @layer components */
 
 

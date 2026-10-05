@@ -20,13 +20,13 @@ export function EmptyState({
         style={{
           background: "var(--accent-light)",
           border: "1px solid var(--border-accent)",
-          boxShadow: "0 0 24px -8px rgba(108, 71, 255, 0.5)",
+          boxShadow: "0 0 24px -8px var(--accent-glow)",
         }}
       >
         {icon ?? <IconDefaultEmpty />}
       </div>
-      <h3 className="text-[15px] font-semibold mb-1.5 text-white">{title}</h3>
-      <p className="text-[13px] max-w-[480px] leading-[20px] mb-5 text-slate-400">{description}</p>
+      <h3 className="text-[15px] font-semibold mb-1.5 text-[var(--text-primary)]">{title}</h3>
+      <p className="text-[13px] max-w-[480px] leading-[20px] mb-5 text-[var(--text-dim)]">{description}</p>
       {action && <div className="mb-4">{action}</div>}
       {children}
     </div>

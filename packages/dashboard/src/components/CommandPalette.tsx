@@ -208,7 +208,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
       aria-modal="true"
       aria-label="Command palette"
       style={{
-        backgroundColor: "rgba(5, 7, 12, 0.72)",
+        backgroundColor: "var(--bg-scrim)",
         backdropFilter: "blur(8px)",
       }}
       onClick={onClose}
@@ -216,9 +216,9 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
       <div
         className="w-full max-w-[620px] rounded-[14px] overflow-hidden flex flex-col ts-dialog"
         style={{
-          background: "#111422",
-          border: "1px solid rgba(108, 71, 255, 0.35)",
-          boxShadow: "0 20px 60px -15px rgba(0, 0, 0, 0.8), 0 0 40px -5px rgba(108, 71, 255, 0.25)",
+          background: "var(--bg-surface)",
+          border: "1px solid var(--accent-glow)",
+          boxShadow: "0 20px 60px -15px var(--shadow-scrim), 0 0 40px -5px var(--accent-glow)",
         }}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
@@ -228,7 +228,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
           className="flex items-center gap-3 px-4 py-3.5"
           style={{ borderBottom: "1px solid var(--border)" }}
         >
-          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" className="text-[#A78BFA] shrink-0" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" className="text-[var(--accent-text)] shrink-0" aria-hidden="true">
             <path
               d="M9 16A7 7 0 1 0 9 2a7 7 0 0 0 0 14Zm10 3-4.35-4.35"
               stroke="currentColor"
@@ -246,7 +246,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
               setSelectedIndex(0);
             }}
             aria-label="Command palette search"
-            className="flex-1 bg-transparent border-none text-[14px] text-white placeholder-slate-400 focus:outline-none"
+            className="flex-1 bg-transparent border-none text-[14px] text-[var(--text-primary)] placeholder-slate-400 focus:outline-none"
           />
           <kbd className="ts-kbd">ESC</kbd>
         </div>
@@ -255,7 +255,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
         {toastMessage && (
           <div
             role="status"
-            className="bg-[#6C47FF]/20 border-b border-[#6C47FF]/40 text-[#C4B5FD] text-[12px] px-4 py-2 font-medium flex items-center justify-between ts-toast"
+            className="bg-[var(--accent-light)] border-b border-[var(--border)] text-[var(--accent-text)] text-[12px] px-4 py-2 font-medium flex items-center justify-between ts-toast"
           >
             <span>{toastMessage}</span>
             <span aria-hidden="true">✓</span>
@@ -265,7 +265,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
         {/* Actions List */}
         <div className="max-h-[380px] overflow-y-auto p-2 space-y-1 ts-scroll-fade" role="listbox" aria-label="Available commands">
           {filtered.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-[13px]">
+            <div className="py-12 text-center text-[var(--text-dim)] text-[13px]">
               No actions found for &quot;{query}&quot;
             </div>
           ) : (
@@ -279,13 +279,13 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
                   onClick={() => item.run()}
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-[8px] cursor-pointer transition-all duration-120 ${
-                    isSelected ? "bg-[#6C47FF]/20 text-white" : "text-slate-300 hover:bg-white/[0.04]"
+                    isSelected ? "bg-[var(--accent-light)] text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:bg-[var(--accent-light)]"
                   }`}
                   style={{
-                    border: isSelected ? "1px solid rgba(108, 71, 255, 0.4)" : "1px solid transparent",
+                    border: isSelected ? "1px solid var(--accent-glow)" : "1px solid transparent",
                   }}
                 >
-                  <span className="text-[16px] w-[26px] h-[26px] rounded-[6px] bg-[#161B2E] flex items-center justify-center shrink-0" style={{ border: "1px solid var(--border-dim)" }} aria-hidden="true">
+                  <span className="text-[16px] w-[26px] h-[26px] rounded-[6px] bg-[var(--bg-surface-2)] flex items-center justify-center shrink-0" style={{ border: "1px solid var(--border-dim)" }} aria-hidden="true">
                     {item.icon}
                   </span>
                   <div className="flex-1 min-w-0">
@@ -294,17 +294,17 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
                       <span
                         className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded font-semibold tracking-wider"
                         style={{
-                          background: isSelected ? "rgba(108, 71, 255, 0.4)" : "rgba(255, 255, 255, 0.06)",
-                          color: isSelected ? "#E0E7FF" : "#94A3B8",
+                          background: isSelected ? "var(--accent)" : "var(--bg-surface-2)",
+                          color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
                         }}
                       >
                         {item.badge}
                       </span>
                     </div>
-                    <div className="text-[11px] text-slate-400 truncate">{item.subtitle}</div>
+                    <div className="text-[11px] text-[var(--text-dim)] truncate">{item.subtitle}</div>
                   </div>
                   {isSelected && (
-                    <span className="text-[11px] font-mono text-[#A78BFA] shrink-0 font-medium">
+                    <span className="text-[11px] font-mono text-[var(--accent-text)] shrink-0 font-medium">
                       ↵ select
                     </span>
                   )}
@@ -316,7 +316,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
 
         {/* Footer info bar */}
         <div
-          className="px-4 py-2.5 flex items-center justify-between text-[11px] text-slate-400"
+          className="px-4 py-2.5 flex items-center justify-between text-[11px] text-[var(--text-dim)]"
           style={{ background: "var(--bg-page)", borderTop: "1px solid var(--border)" }}
         >
           <div className="flex items-center gap-3">
@@ -328,7 +328,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
             </span>
           </div>
           <div className="flex items-center gap-1.5 font-medium" style={{ color: "var(--accent-text)" }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#6C47FF]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
             TraceSketch DevEngine
           </div>
         </div>

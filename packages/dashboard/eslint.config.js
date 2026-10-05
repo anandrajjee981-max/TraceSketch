@@ -26,7 +26,7 @@ export default defineConfig([
     rules: {
       'react-refresh/only-export-components': [
         'error',
-        { allowExportNames: ['useConfig', 'useTraceSimulator'] },
+        { allowExportNames: ['useConfig', 'useTraceSimulator', 'useTheme'] },
       ],
     },
   },

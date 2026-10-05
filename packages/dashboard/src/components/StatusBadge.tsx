@@ -7,16 +7,16 @@ type Tone = { color: string; bg: string; border: string; dot: string };
 
 const statusTone = (code: number): Tone => {
   if (code >= 200 && code < 300) {
-    return { color: "var(--green)", bg: "var(--green-bg)", border: "var(--green-border)", dot: "#10B981" };
+    return { color: "var(--green)", bg: "var(--green-bg)", border: "var(--green-border)", dot: "var(--green)" };
   }
   if (code >= 300 && code < 400) {
-    return { color: "var(--blue)", bg: "var(--blue-bg)", border: "var(--blue-border)", dot: "#38BDF8" };
+    return { color: "var(--blue)", bg: "var(--blue-bg)", border: "var(--blue-border)", dot: "var(--blue)" };
   }
   if (code >= 400 && code < 500) {
-    return { color: "var(--amber)", bg: "var(--amber-bg)", border: "var(--amber-border)", dot: "#F59E0B" };
+    return { color: "var(--amber)", bg: "var(--amber-bg)", border: "var(--amber-border)", dot: "var(--amber)" };
   }
   if (code >= 500) {
-    return { color: "var(--red)", bg: "var(--red-bg)", border: "var(--red-border)", dot: "#F43F5E" };
+    return { color: "var(--red)", bg: "var(--red-bg)", border: "var(--red-border)", dot: "var(--red)" };
   }
   return { color: "var(--text-dim)", bg: "var(--bg-surface-2)", border: "var(--border)", dot: "var(--text-dim)" };
 };
@@ -42,13 +42,13 @@ export function StatusBadge({ code, showDot = true }: Props) {
 
 const resultTone = (status: "success" | "fail" | "warning" | "neutral"): Tone => {
   if (status === "success") {
-    return { color: "var(--green)", bg: "var(--green-bg)", border: "var(--green-border)", dot: "#10B981" };
+    return { color: "var(--green)", bg: "var(--green-bg)", border: "var(--green-border)", dot: "var(--green)" };
   }
   if (status === "fail") {
-    return { color: "var(--red)", bg: "var(--red-bg)", border: "var(--red-border)", dot: "#F43F5E" };
+    return { color: "var(--red)", bg: "var(--red-bg)", border: "var(--red-border)", dot: "var(--red)" };
   }
   if (status === "warning") {
-    return { color: "var(--amber)", bg: "var(--amber-bg)", border: "var(--amber-border)", dot: "#F59E0B" };
+    return { color: "var(--amber)", bg: "var(--amber-bg)", border: "var(--amber-border)", dot: "var(--amber)" };
   }
   return { color: "var(--text-secondary)", bg: "var(--bg-surface-2)", border: "var(--border)", dot: "var(--text-dim)" };
 };

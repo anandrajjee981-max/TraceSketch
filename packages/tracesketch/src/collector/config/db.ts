@@ -84,12 +84,50 @@ CREATE TABLE IF NOT EXISTS group_history (
   entry_type TEXT NOT NULL,
   trace_id TEXT,
   data TEXT,
-  saved_at INTEGER NOT NULL
+  saved_at INTEGER NOT NULL,
+  -- The relay's Mongo _id for the message this row mirrors. Lets the browser
+  -- and the collector's socket client both write the same message without
+  -- producing two rows. NULL for rows written before this column existed;
+  -- SQLite permits many NULLs under a UNIQUE index, so they never collide.
+  source_id TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_group_history_group ON group_history(group_code, saved_at);
 CREATE INDEX IF NOT EXISTS idx_group_history_instance ON group_history(instance_id);
 
+-- Which groups this machine is currently a member of, so the collector can hold
+-- a relay socket for each one with no browser tab open.
+--
+-- session_id pins the exact relay session (its Mongo _id). A 4-character code is
+-- recycled, so a stored session_id is how the archiver detects that a code now
+-- belongs to a different session and stops recording it.
+CREATE TABLE IF NOT EXISTS group_membership (
+  group_code TEXT PRIMARY KEY,
+  session_id TEXT,
+  active INTEGER NOT NULL DEFAULT 1,
+  updated_at INTEGER NOT NULL
+);
+
+  `);
+
+  // Migrations for databases created before source_id / group_membership existed.
+  // CREATE TABLE IF NOT EXISTS above is a no-op on an existing table, so new
+  // columns have to be added explicitly or older installs never get them.
+  const groupHistoryColumns = db
+    .pragma('table_info(group_history)')
+    .map((column: { name: string }) => column.name);
+
+  if (!groupHistoryColumns.includes('source_id')) {
+    db.exec('ALTER TABLE group_history ADD COLUMN source_id TEXT');
+    console.log('Migrated group_history: added source_id column');
+  }
+
+  // Unique so the second writer of a given relay message loses the insert
+  // instead of duplicating it. Created after the column exists, otherwise this
+  // would throw on a database that predates it.
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_group_history_source
+      ON group_history(source_id);
   `);
 
   const regressionColumns = db

@@ -163,3 +163,39 @@ export async function getGroupRole(
   if (group.joinerInstanceId === instanceId) return "joiner";
   return null;
 }
+
+/**
+ * Membership check that also hands back the session's identity.
+ *
+ * The Mongo `_id` is what makes a session distinguishable from a later one that
+ * happens to reuse the same 4-character code. The collector is a long-lived
+ * headless process, so it pins this value and refuses to keep archiving a code
+ * that has since been recycled to a different session — otherwise a background
+ * daemon would quietly copy an unrelated team's conversation into this machine's
+ * permanent local history with nobody watching.
+ *
+ * Same authorisation rule as getGroupRole(): a seat in Mongo is required, so
+ * knowing the code is never sufficient.
+ */
+export type GroupSession = {
+  role: GroupRole;
+  sessionId: string;
+};
+
+export async function getGroupSession(
+  groupCode: string,
+  instanceId: string,
+): Promise<GroupSession | null> {
+  const group = await groupmodel.findOne({ groupCode }).lean();
+  if (!group) return null;
+
+  const role: GroupRole | null =
+    group.creatorInstanceId === instanceId
+      ? "creator"
+      : group.joinerInstanceId === instanceId
+        ? "joiner"
+        : null;
+
+  if (!role) return null;
+  return { role, sessionId: group._id.toString() };
+}

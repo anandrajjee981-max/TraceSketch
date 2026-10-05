@@ -3,9 +3,46 @@ import {
   getHistory,
   listGroupsForInstance,
   recordHistory,
+  deleteHistoryForGroup,
   isHistoryEntryType,
   type HistoryEntryType,
 } from "../dao/group-history.dao.js";
+
+/**
+ * DELETE /group/:code/history
+ *
+ * Lets a participant clear out an archived session they no longer want in their
+ * list. Authorisation is a recorded history row for that instance — see
+ * deleteHistoryForGroup for why the (by then usually expired) Group document
+ * cannot be used instead.
+ */
+export async function deleteHistoryController(req: Request, res: Response) {
+  try {
+    const groupCode = req.params.code as string;
+    const { instanceId } = req.body;
+
+    if (!instanceId) {
+      return res.status(400).json({ message: "instanceId is required" });
+    }
+
+    const result = await deleteHistoryForGroup(groupCode, instanceId);
+
+    if (!result.ok) {
+      return res.status(403).json({
+        message: "You were not a participant in this group's history",
+      });
+    }
+
+    return res.status(200).json({
+      group_code: groupCode,
+      deleted: result.deleted,
+      message: `Deleted ${result.deleted} archived entr${result.deleted !== 1 ? "ies" : "y"}`,
+    });
+  } catch (err) {
+    console.error("deleteHistoryController error:", err);
+    return res.status(500).json({ message: "internal server error" });
+  }
+}
 
 /**
  * POST /group/:code/history — record a membership marker.

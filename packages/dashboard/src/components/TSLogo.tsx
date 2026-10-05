@@ -29,15 +29,15 @@ export function TSLogoMarkFilled({ size = 40 }: { size?: number }) {
       {/* ── T: Skewed parallelogram top bar (angled right side matching logo) */}
       <path
         d="M16 10 L98 10 L106 27 L24 27 Z"
-        fill="#1D2235"
+        fill="var(--text-primary)"
       />
       {/* T: vertical stem */}
-      <rect x="30" y="27" width="20" height="68" rx="2" fill="#1D2235" />
+      <rect x="30" y="27" width="20" height="68" rx="2" fill="var(--text-primary)" />
 
       {/* ── S: upper arc — top arm sweeps right then curves down */}
       <path
         d="M54 27 L88 27 C102 27 112 37 112 50 C112 63 102 70 88 70 L58 70"
-        stroke="#6C47FF"
+        stroke="var(--accent)"
         strokeWidth="17"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -46,7 +46,7 @@ export function TSLogoMarkFilled({ size = 40 }: { size?: number }) {
       {/* S: lower arc — bottom arm sweeps left then curves down-right */}
       <path
         d="M58 70 C50 70 48 74 48 78 C48 82 50 86 58 86 L92 86 C100 86 104 82 104 78"
-        stroke="#6C47FF"
+        stroke="var(--accent)"
         strokeWidth="17"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -55,7 +55,7 @@ export function TSLogoMarkFilled({ size = 40 }: { size?: number }) {
       {/* S: middle connection back up — completes the S loop */}
       <path
         d="M58 70 C50 70 48 66 48 62 C48 58 50 55 58 55 L88 55 C96 55 100 48 100 42 C100 36 97 27 88 27"
-        stroke="#6C47FF"
+        stroke="var(--accent)"
         strokeWidth="17"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -86,8 +86,8 @@ export function TSLogo({
             lineHeight: 1,
           }}
         >
-          <span style={{ color: "#FFFFFF" }}>Trace</span>
-          <span style={{ color: "#6C47FF" }}>Sketch</span>
+          <span style={{ color: "var(--text-primary)" }}>Trace</span>
+          <span style={{ color: "var(--accent)" }}>Sketch</span>
         </span>
       )}
     </div>

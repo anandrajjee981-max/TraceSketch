@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import { TSLogoMarkFilled } from "./TSLogo";
 
 function IconTraces({ active }: { active?: boolean }) {
-  const stroke = active ? "#A78BFA" : "var(--text-dim)";
+  const stroke = active ? "var(--accent)" : "var(--text-secondary)";
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0">
       <path d="M5 2.5H9.2L12 5.3V13.5H5V2.5Z" stroke={stroke} strokeWidth="1.3" strokeLinejoin="round" />
@@ -13,7 +13,7 @@ function IconTraces({ active }: { active?: boolean }) {
 }
 
 function IconReplay({ active }: { active?: boolean }) {
-  const stroke = active ? "#A78BFA" : "var(--text-dim)";
+  const stroke = active ? "var(--accent)" : "var(--text-secondary)";
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0">
       <path d="M8 13.5A5.5 5.5 0 1 0 3.2 7.2" stroke={stroke} strokeWidth="1.3" strokeLinecap="round" />
@@ -24,7 +24,7 @@ function IconReplay({ active }: { active?: boolean }) {
 }
 
 function IconRegression({ active }: { active?: boolean }) {
-  const stroke = active ? "#A78BFA" : "var(--text-dim)";
+  const stroke = active ? "var(--accent)" : "var(--text-secondary)";
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0">
       <path d="M2.5 13.5H13.5" stroke={stroke} strokeWidth="1.3" strokeLinecap="round" />
@@ -35,7 +35,7 @@ function IconRegression({ active }: { active?: boolean }) {
 }
 
 function IconRelay({ active }: { active?: boolean }) {
-  const stroke = active ? "#A78BFA" : "var(--text-dim)";
+  const stroke = active ? "var(--accent)" : "var(--text-secondary)";
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0">
       <circle cx="5.5" cy="4.5" r="2" stroke={stroke} strokeWidth="1.3" />
@@ -47,7 +47,7 @@ function IconRelay({ active }: { active?: boolean }) {
 }
 
 function IconSettings({ active }: { active?: boolean }) {
-  const stroke = active ? "#A78BFA" : "var(--text-dim)";
+  const stroke = active ? "var(--accent)" : "var(--text-secondary)";
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0">
       <path d="M8 10.5A2.5 2.5 0 1 0 8 5.5a2.5 2.5 0 0 0 0 5Z" stroke={stroke} strokeWidth="1.3" />
@@ -62,7 +62,7 @@ function IconSettings({ active }: { active?: boolean }) {
 }
 
 function IconGlobe({ active }: { active?: boolean }) {
-  const stroke = active ? "#A78BFA" : "var(--text-dim)";
+  const stroke = active ? "var(--accent)" : "var(--text-secondary)";
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0">
       <circle cx="8" cy="8" r="6" stroke={stroke} strokeWidth="1.3" />
@@ -142,8 +142,8 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
               <TSLogoMarkFilled size={24} />
             </div>
             <div className="flex items-baseline gap-0 flex-1 min-w-0">
-              <span className="text-[13px] font-extrabold tracking-[-0.02em] text-white leading-none">Trace</span>
-              <span className="text-[13px] font-extrabold tracking-[-0.02em] text-[#6C47FF] leading-none">Sketch</span>
+              <span className="text-[13px] font-extrabold tracking-[-0.02em] text-[var(--text-primary)] leading-none">Trace</span>
+              <span className="text-[13px] font-extrabold tracking-[-0.02em] text-[var(--accent)] leading-none">Sketch</span>
             </div>
             <button
               onClick={onToggle}
@@ -180,13 +180,13 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       {!collapsed && (
         <div className="mt-auto p-3 m-2 rounded-[8px] ts-card" style={{ background: "var(--bg-surface-2)" }}>
           <div className="flex items-center gap-2 mb-1">
-            <span className="w-2 h-2 rounded-full bg-[#10B981] shadow-[0_0_6px_#10B981]" />
-            <span className="text-[11px] font-mono font-bold text-white">Local-First Mode</span>
+            <span className="w-2 h-2 rounded-full bg-[var(--green)]" />
+            <span className="text-[11px] font-mono font-bold text-[var(--text-primary)]">Local-First Mode</span>
           </div>
-          <p className="text-[10px] text-slate-400 font-sans leading-tight">
+          <p className="text-[10px] text-[var(--text-dim)] font-sans leading-tight">
             SQLite database active. 0 cloud telemetry sent.
           </p>
-          <div className="mt-2 text-[9px] text-[#A78BFA] font-mono">
+          <div className="mt-2 text-[9px] text-[var(--accent-text)] font-mono">
             Press <kbd className="ts-kbd">⌘K</kbd> for quick actions
           </div>
         </div>

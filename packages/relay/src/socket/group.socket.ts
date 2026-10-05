@@ -1,5 +1,5 @@
 import type { Server, Socket } from "socket.io";
-import { getGroupRole, type GroupRole } from "../dao/group.dao.js";
+import { getGroupSession, type GroupSession } from "../dao/group.dao.js";
 import { addMessage } from "../dao/group-message.dao.js";
 
 type Ack = (response: unknown) => void;
@@ -8,7 +8,9 @@ declare module "socket.io" {
   interface SocketData {
     groupCode?: string;
     instanceId?: string;
-    role?: GroupRole;
+    role?: GroupSession["role"];
+    observer?: boolean;
+    sessionId?: string;
   }
 }
 
@@ -25,14 +27,23 @@ export function registerGroupSocket(io: Server): void {
     socket.data.groupCode = undefined;
     socket.data.instanceId = undefined;
     socket.data.role = undefined;
+    socket.data.observer = false;
+    socket.data.sessionId = undefined;
 
     console.log("Socket connected:", socket.id);
 
     socket.on(
       "join-room",
-      async (payload: { groupCode?: string; instanceId?: string }, ack?: Ack) => {
+      async (
+        payload: { groupCode?: string; instanceId?: string; observer?: boolean },
+        ack?: Ack,
+      ) => {
         const groupCode = payload?.groupCode?.trim().toUpperCase();
         const instanceId = payload?.instanceId?.trim();
+        // Observers are non-human listeners (the collector's archiver). They hold
+        // a real seat and receive every message, but must be invisible to the
+        // humans in the room - see the peer-left/user-joined suppression below.
+        const observer = payload?.observer === true;
 
         const fail = (message: string, code: string) => {
           ack?.({ success: false, code, message });
@@ -44,9 +55,9 @@ export function registerGroupSocket(io: Server): void {
         }
 
         try {
-          const role = await getGroupRole(groupCode, instanceId);
+          const session = await getGroupSession(groupCode, instanceId);
 
-          if (!role) {
+          if (!session) {
             return fail(
               "No session found for this code and instance id",
               "NOT_A_MEMBER",
@@ -57,20 +68,43 @@ export function registerGroupSocket(io: Server): void {
           // credentials must not leave it subscribed to the old one.
           if (socket.data.groupCode && socket.data.groupCode !== groupCode) {
             await socket.leave(socket.data.groupCode);
-            socket.to(socket.data.groupCode).emit("peer-left", { instanceId: socket.data.instanceId });
+            if (!socket.data.observer) {
+              socket.to(socket.data.groupCode).emit("peer-left", { instanceId: socket.data.instanceId });
+            }
           }
 
           socket.data.groupCode = groupCode;
           socket.data.instanceId = instanceId;
-          socket.data.role = role;
+          socket.data.role = session.role;
+          socket.data.observer = observer;
+          socket.data.sessionId = session.sessionId;
           await socket.join(groupCode);
 
-          console.log(`Socket ${socket.id} joined room ${groupCode} as ${role}`);
+          console.log(
+            `Socket ${socket.id} joined room ${groupCode} as ${session.role}${observer ? " (observer)" : ""}`,
+          );
 
-          socket.emit("joined", { groupCode, instanceId, role });
-          socket.to(groupCode).emit("user-joined", { instanceId, role });
+          // sessionId is returned so a long-lived observer can pin the exact
+          // session it is archiving and detect the code being recycled later.
+          socket.emit("joined", {
+            groupCode,
+            instanceId,
+            role: session.role,
+            sessionId: session.sessionId,
+            observer,
+          });
+          if (!observer) {
+            socket.to(groupCode).emit("user-joined", { instanceId, role: session.role });
+          }
 
-          ack?.({ success: true, groupCode, instanceId, role });
+          ack?.({
+            success: true,
+            groupCode,
+            instanceId,
+            role: session.role,
+            sessionId: session.sessionId,
+            observer,
+          });
         } catch (error) {
           console.error("join-room error:", error);
           return fail("Failed to join room", "INTERNAL_ERROR");
@@ -132,7 +166,9 @@ export function registerGroupSocket(io: Server): void {
 
     socket.on("disconnect", (reason) => {
       console.log("Socket disconnected:", socket.id, "-", reason);
-      if (socket.data.groupCode) {
+      // Observers are invisible to the humans in the room: a collector restart
+      // or a network blip must never be reported as "the other developer left".
+      if (socket.data.groupCode && !socket.data.observer) {
         socket
           .to(socket.data.groupCode)
           .emit("peer-left", { instanceId: socket.data.instanceId });

@@ -47,12 +47,12 @@ export function Pagination({ page, pageSize, total, onPageChange }: Props) {
                   ? {
                       background: "var(--accent)",
                       border: "1px solid var(--accent)",
-                      color: "#ffffff",
+                      color: "var(--on-accent)",
                       borderRadius: "var(--radius-sm)",
                       cursor: "pointer",
                       fontSize: "12px",
                       fontWeight: 600,
-                      boxShadow: "0 0 14px -3px rgba(108, 71, 255, 0.6)",
+                      boxShadow: "0 0 14px -3px var(--accent-glow)",
                     }
                   : {
                       background: "var(--bg-surface)",

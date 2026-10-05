@@ -1,16 +1,43 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#6C47FF" />
+    <meta name="theme-color" content="#faf8f5" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TraceSketch — Local-First API Flight Recorder & Replay</title>
-    <script type="module" crossorigin src="/assets/index-BmCzzXl1.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-B5mVXjjd.css">
+    <title>TraceSketch — Local-First API Flight Recorder &amp; Replay</title>
+    <script>
+      // Resolve the theme before first paint.
+      //
+      // Without this the app would always paint light and then snap to dark
+      // once React mounted — a white flash on every reload for dark-mode users,
+      // and a visible "contradiction" while it happened. This mirrors
+      // resolveInitialTheme() in src/context/ThemeContext.tsx; keep the two in
+      // sync. Ground colors must match --bg-page in index.css.
+      (function () {
+        try {
+          var stored = localStorage.getItem('tracesketch-theme');
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          if (theme === 'dark') document.documentElement.classList.add('dark');
+          document.documentElement.style.colorScheme = theme;
+          document
+            .querySelector('meta[name="theme-color"]')
+            .setAttribute('content', theme === 'dark' ? '#0b0b11' : '#faf8f5');
+        } catch (e) {
+          /* storage blocked: fall back to the light default already in CSS */
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-BuKYj4rL.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DdSMEY_P.css">
   </head>
-  <body class="bg-[#0A0D14] text-[#E2E8F0] antialiased selection:bg-[#6C47FF]/30 selection:text-[#A78BFA]">
+  <body class="antialiased">
     <div id="root"></div>
   </body>
 </html>

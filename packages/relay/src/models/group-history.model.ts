@@ -29,7 +29,10 @@ const groupHistorySchema = new mongoose.Schema(
     // trace_id is set.
     traceId: { type: String, default: null },
     data: { type: String, default: null },
-    createdAt: { type: Date, default: Date.now ,expires:21600},
+    // NO `expires` here. Adding it makes Mongoose create a TTL index on
+    // createdAt, and MongoDB's TTL monitor then silently deletes the whole
+    // archive 6h in — which defeats the entire purpose of this collection.
+    createdAt: { type: Date, default: Date.now },
   },
   { collection: "group_history", versionKey: false },
 );

@@ -43,7 +43,7 @@ export function Settings() {
               <div className="ts-card-title">Instance Identity</div>
               <div className="ts-card-subtitle">Unique identifier for this machine&apos;s local SQLite collector.</div>
             </div>
-            <span className="w-2.5 h-2.5 rounded-full bg-[#10B981] shadow-[0_0_8px_#10B981] shrink-0" aria-label="Collector reachable" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[var(--green)] shrink-0" aria-label="Collector reachable" />
           </div>
 
           <div className="ts-card-body space-y-5">
@@ -51,7 +51,7 @@ export function Settings() {
               <label className="ts-label">Instance ID</label>
               <div className="flex flex-wrap items-center gap-2.5">
                 <code
-                  className="flex-1 min-w-[240px] ts-mono text-[13px] rounded-[8px] px-3.5 py-2.5 break-all text-white font-medium select-all"
+                  className="flex-1 min-w-[240px] ts-mono text-[13px] rounded-[8px] px-3.5 py-2.5 break-all text-[var(--text-primary)] font-medium select-all"
                   style={{ background: "var(--bg-page)", border: "1px solid var(--border)" }}
                 >
                   {instanceId}
@@ -70,7 +70,7 @@ export function Settings() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="rounded-[10px] p-4 ts-stagger" style={{ ["--stagger-i" as string]: 1, background: "var(--bg-surface-2)", border: "1px solid var(--border)" }}>
                 <div className="ts-overline">Collector Endpoint</div>
-                <div className="ts-mono text-[12px] text-white font-medium break-all mt-1.5">
+                <div className="ts-mono text-[12px] text-[var(--text-primary)] font-medium break-all mt-1.5">
                   {apiBaseUrl || `http://localhost:4000 (Vite proxy)`}
                 </div>
               </div>
@@ -79,7 +79,7 @@ export function Settings() {
                 <div className="ts-overline" style={{ color: "var(--blue)" }}>
                   Local-First Isolation
                 </div>
-                <div className="text-[12px] leading-[18px] mt-1.5 text-slate-300">
+                <div className="text-[12px] leading-[18px] mt-1.5 text-[var(--text-secondary)]">
                   All traces are stored in <code className="ts-mono" style={{ color: "var(--accent-text)" }}>~/.tracebox/tracebox.db</code>. No telemetry
                   leaves your machine.
                 </div>
@@ -104,7 +104,7 @@ export function Settings() {
             </CopyButton>
           </div>
           <div className="ts-card-body">
-            <pre className="text-[12px] leading-[20px] font-mono whitespace-pre-wrap break-all p-3.5 rounded-[9px] text-slate-300" style={{ background: "var(--bg-page)", border: "1px solid var(--border)" }}>
+            <pre className="text-[12px] leading-[20px] font-mono whitespace-pre-wrap break-all p-3.5 rounded-[9px] text-[var(--text-secondary)]" style={{ background: "var(--bg-page)", border: "1px solid var(--border)" }}>
 {`curl -X POST ${apiBaseUrl || "http://localhost:4000"}/traces \\
   -H "Content-Type: application/json" \\
   -H "x-instance-id: ${instanceId}" \\

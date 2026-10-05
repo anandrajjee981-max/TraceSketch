@@ -209,7 +209,7 @@ export function TracesList() {
         description="Real-time recorded HTTP requests with microsecond span waterfalls and replay capabilities."
         badge={
           <Badge>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-ping" aria-hidden="true" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--live)] animate-ping" aria-hidden="true" />
             Live Feed
           </Badge>
         }
@@ -235,10 +235,10 @@ export function TracesList() {
         >
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[13px] font-semibold text-white">Relay — Real-Time Pair Debugging</span>
+              <span className="text-[13px] font-semibold text-[var(--text-primary)]">Relay — Real-Time Pair Debugging</span>
               <Badge>Live</Badge>
             </div>
-            <p className="text-[12px] text-slate-400 leading-snug">
+            <p className="text-[12px] text-[var(--text-dim)] leading-snug">
               Two developers, a shared group code, live chat plus shared trace context in real time.
             </p>
           </div>
@@ -253,12 +253,12 @@ export function TracesList() {
         >
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[13px] font-semibold text-white">OpenAPI Documentation Generator</span>
+              <span className="text-[13px] font-semibold text-[var(--text-primary)]">OpenAPI Documentation Generator</span>
               <span className="ts-chip" style={{ color: "var(--amber)", background: "var(--amber-bg)", border: "1px solid var(--amber-border)" }}>
                 Coming Soon
               </span>
             </div>
-            <p className="text-[12px] text-slate-400 leading-snug">
+            <p className="text-[12px] text-[var(--text-dim)] leading-snug">
               Observes captured traces to automatically generate OpenAPI/Swagger specs with zero manual writing.
             </p>
           </div>
@@ -418,14 +418,14 @@ export function TracesList() {
                       style={{ ["--stagger-i" as string]: Math.min(i, 10) }}
                     >
                       <td className="whitespace-nowrap max-w-[180px]">
-                        <span className="ts-mono text-[12px] font-semibold ts-truncate inline-block max-w-[170px] align-bottom transition-colors group-hover:text-white text-[var(--accent-text)]" title={t.trace_id}>
+                        <span className="ts-mono text-[12px] font-semibold ts-truncate inline-block max-w-[170px] align-bottom transition-colors group-hover:text-[var(--text-primary)] text-[var(--accent-text)]" title={t.trace_id}>
                           {t.trace_id.slice(0, 10)}…
                         </span>
                       </td>
                       <td className="whitespace-nowrap">
                         <MethodBadge method={t.method} />
                       </td>
-                      <td className="ts-mono text-[12px] font-medium max-w-[280px] truncate text-slate-200" title={t.path}>
+                      <td className="ts-mono text-[12px] font-medium max-w-[280px] truncate text-[var(--text-secondary)]" title={t.path}>
                         {t.path}
                       </td>
                       <td className="whitespace-nowrap">
@@ -440,7 +440,7 @@ export function TracesList() {
                       <td className="whitespace-nowrap">
                         <span className="ts-code">{t.environment}</span>
                       </td>
-                      <td className="whitespace-nowrap text-[12px] text-slate-400 ts-mono ts-numeric" title={absoluteTime(t.created_at)}>
+                      <td className="whitespace-nowrap text-[12px] text-[var(--text-dim)] ts-mono ts-numeric" title={absoluteTime(t.created_at)}>
                         {relativeTime(t.created_at)}
                       </td>
                     </tr>

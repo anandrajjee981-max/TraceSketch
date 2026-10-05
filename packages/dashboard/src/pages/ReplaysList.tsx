@@ -140,11 +140,11 @@ export function ReplaysList() {
                     style={{ ["--stagger-i" as string]: Math.min(i, 10) }}
                   >
                     <td className="whitespace-nowrap">
-                      <span className="ts-mono text-[12px] font-semibold transition-colors group-hover:text-white text-[var(--accent-text)]" title={r.trace_id}>
+                      <span className="ts-mono text-[12px] font-semibold transition-colors group-hover:text-[var(--text-primary)] text-[var(--accent-text)]" title={r.trace_id}>
                         {r.trace_id.slice(0, 10)}…
                       </span>
                     </td>
-                    <td className="ts-mono text-[12px] max-w-[220px] truncate text-slate-300" title={r.target_base_url}>
+                    <td className="ts-mono text-[12px] max-w-[220px] truncate text-[var(--text-secondary)]" title={r.target_base_url}>
                       {r.target_base_url}
                     </td>
                     <td className="whitespace-nowrap">
@@ -154,7 +154,7 @@ export function ReplaysList() {
                         <span style={{ color: "var(--text-dim)" }}>—</span>
                       )}
                     </td>
-                    <td className="whitespace-nowrap ts-mono text-[12px] ts-numeric text-slate-200">
+                    <td className="whitespace-nowrap ts-mono text-[12px] ts-numeric text-[var(--text-secondary)]">
                       {r.duration_ms != null ? `${r.duration_ms} ms` : "—"}
                     </td>
                     <td className="whitespace-nowrap">
@@ -163,7 +163,7 @@ export function ReplaysList() {
                         label={r.result ?? "—"}
                       />
                     </td>
-                    <td className="whitespace-nowrap text-[12px] text-slate-400 ts-mono ts-numeric" title={absoluteTime(r.created_at)}>
+                    <td className="whitespace-nowrap text-[12px] text-[var(--text-dim)] ts-mono ts-numeric" title={absoluteTime(r.created_at)}>
                       {relativeTime(r.created_at)}
                     </td>
                   </tr>

@@ -9,6 +9,7 @@ import regressionrouter from "./routes/regression.route";
 import groupRouter from "./routes/group.routes";
 import cron from 'node-cron';
 import { cleanExpiredTraces } from "./dao/trace.dao";
+import { resumeActiveMemberships } from "./relay-archiver";
 
 const app = express();
 
@@ -61,6 +62,11 @@ export function startCollector() {
   const instance = getOrCreateInstance();
   cachedInstance = instance;
   console.log(`traceSketch instance ready: ${instance.instance_id}`);
+
+  // Re-open relay sockets for groups this machine is still a member of. Without
+  // this the local archive would go stale after every collector restart, since
+  // the dashboard only announces a membership when a user actually joins.
+  resumeActiveMemberships();
 
   const PORT = Number(process.env.PORT ?? 4000);
 

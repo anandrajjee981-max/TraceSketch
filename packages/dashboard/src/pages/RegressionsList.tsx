@@ -162,7 +162,7 @@ export function RegressionsList() {
 
                   return (
                     <tr key={reg.id} className="ts-stagger" style={{ ["--stagger-i" as string]: Math.min(i, 10) }}>
-                      <td className="font-medium text-slate-100 max-w-[240px]">
+                      <td className="font-medium text-[var(--text-primary)] max-w-[240px]">
                         <div className="flex items-center gap-2">
                           <span style={{ color: "var(--accent-text)" }} aria-hidden="true">
                             🧪
@@ -212,13 +212,13 @@ export function RegressionsList() {
                           {rState.result && (
                             <div className="flex items-center gap-2 text-[11px] ts-pop">
                               <ResultBadge status={rState.result.passed ? "success" : "fail"} label={rState.result.passed ? "PASSED" : "FAILED"} />
-                              <span className="text-slate-400 ts-mono text-[11px] ts-numeric">Got {rState.result.actual_status}</span>
+                              <span className="text-[var(--text-dim)] ts-mono text-[11px] ts-numeric">Got {rState.result.actual_status}</span>
                             </div>
                           )}
                         </div>
                       </td>
 
-                      <td className="whitespace-nowrap text-[12px] text-slate-400 ts-mono ts-numeric" title={absoluteTime(reg.created_at)}>
+                      <td className="whitespace-nowrap text-[12px] text-[var(--text-dim)] ts-mono ts-numeric" title={absoluteTime(reg.created_at)}>
                         {relativeTime(reg.created_at)}
                       </td>
                     </tr>

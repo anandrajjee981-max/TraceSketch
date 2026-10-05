@@ -292,11 +292,87 @@ export async function listMyGroups(opts?: {
 // and swallow failures so a local-only collector can never break the relay feed.
 
 /**
+ * Delete an archived group's history from both the relay and this machine's
+ * local copy.
+ *
+ * Both are cleared on purpose. The navbar list and the archive view both read
+ * from the relay, so deleting only the local copy would leave the entry in the
+ * list and still render from the relay — the button would look broken. The
+ * local copy is dropped best-effort: the relay is the copy that is actually
+ * visible, so a collector hiccup must not fail the whole action.
+ */
+export async function deleteGroupHistory(
+  groupCode: string,
+  opts: { instanceId?: string; apiBaseUrl?: string; relayBaseUrl?: string }
+): Promise<{ ok: boolean; deleted: number; message?: string }> {
+  const instanceId = opts.instanceId ?? getInstanceId();
+  const base = opts.relayBaseUrl ?? getRelayBase();
+
+  const res = await fetch(`${base}/group/${encodeURIComponent(groupCode)}/history`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ instanceId }),
+  });
+
+  const data = (await res.json().catch(() => ({}))) as {
+    deleted?: number;
+    message?: string;
+  };
+
+  if (!res.ok) {
+    return { ok: false, deleted: 0, message: data.message ?? `HTTP ${res.status}` };
+  }
+
+  try {
+    await fetch(apiUrl(`/groups/history/${encodeURIComponent(groupCode)}`, opts.apiBaseUrl), {
+      method: "DELETE",
+      headers: headers(instanceId),
+    });
+  } catch (err) {
+    console.warn(`[history] local copy for ${groupCode} not cleared:`, err);
+  }
+
+  return { ok: true, deleted: data.deleted ?? 0, message: data.message };
+}
+
+/**
+ * Tell the local collector whether this machine is currently in a group.
+ *
+ * The collector cannot observe a browser joining a relay session on its own, so
+ * this is the only way it learns to hold a relay socket for the group. It
+ * persists the membership, which is what lets the collector's archiver pick the
+ * group back up after a restart without any tab being open.
+ */
+export async function setGroupMembership(
+  groupCode: string,
+  active: boolean,
+  opts?: { instanceId?: string; apiBaseUrl?: string }
+): Promise<void> {
+  try {
+    const url = apiUrl("/groups/membership", opts?.apiBaseUrl);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: headers(opts?.instanceId),
+      body: JSON.stringify({ group_code: groupCode, active }),
+    });
+    if (!res.ok) {
+      console.warn(`[membership] collector rejected ${groupCode} active=${active}: HTTP ${res.status}`);
+    }
+  } catch (err) {
+    console.warn(`[membership] collector unreachable for ${groupCode}:`, err);
+  }
+}
+
+/**
  * Mirror one entry into the collector's local group_history.
  *
  * Never throws, but no longer fails silently either: a non-2xx is logged with
  * its status, because an unchecked `fetch` here previously discarded 404s and
  * connection refusals alike and made a dead collector impossible to diagnose.
+ *
+ * `source_id` is the relay's message id. The collector's own relay socket
+ * archives the same broadcast, and the unique index on source_id makes whichever
+ * writer gets there second a no-op instead of a duplicate row.
  */
 export async function recordGroupHistory(
   payload: {
@@ -305,6 +381,7 @@ export async function recordGroupHistory(
     entry_type: string;
     trace_id?: string | null;
     data?: string | null;
+    source_id?: string | null;
   },
   opts?: { instanceId?: string; apiBaseUrl?: string }
 ): Promise<void> {

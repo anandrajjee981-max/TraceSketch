@@ -4,6 +4,7 @@ import { useConfig } from "../context/ConfigContext";
 import { listMyGroups, type GroupSummary } from "../api/client";
 import { relativeTime } from "../lib/format";
 import { TSLogoMarkFilled } from "./TSLogo";
+import { ThemeToggle } from "./ThemeToggle";
 
 /**
  * Top-right dropdown of every group this instance has previously joined.
@@ -108,7 +109,7 @@ function JoinedGroupsMenu() {
                   className="w-full text-left px-3 py-2 flex items-center justify-between gap-2 hover:bg-[var(--bg-surface-3)] transition-colors"
                   style={{ borderBottom: "1px solid var(--border-dim)" }}
                 >
-                  <span className="ts-mono font-bold tracking-[0.18em] text-[13px] text-white">
+                  <span className="ts-mono font-bold tracking-[0.18em] text-[13px] text-[var(--text-primary)]">
                     {g.group_code}
                   </span>
                   <span className="text-[10px] ts-numeric shrink-0" style={{ color: "var(--text-dim)" }}>
@@ -134,7 +135,7 @@ export function TopNav({ onOpenCommandPalette }: { onOpenCommandPalette?: () => 
     <header
       className="h-[56px] shrink-0 sticky top-0 z-30 flex items-center px-4 sm:px-6 gap-3 backdrop-blur-md"
       style={{
-        background: "rgba(10, 10, 12, 0.82)",
+        background: "var(--bg-nav)",
         borderBottom: "1px solid var(--border)",
         boxShadow: "var(--shadow-sm)",
       }}
@@ -148,8 +149,8 @@ export function TopNav({ onOpenCommandPalette }: { onOpenCommandPalette?: () => 
           <TSLogoMarkFilled size={26} />
         </div>
         <div className="flex items-baseline gap-0">
-          <span className="text-[16px] font-extrabold tracking-[-0.02em] text-white leading-none">Trace</span>
-          <span className="text-[16px] font-extrabold tracking-[-0.02em] text-[#6C47FF] leading-none">Sketch</span>
+          <span className="text-[16px] font-extrabold tracking-[-0.02em] text-[var(--text-primary)] leading-none">Trace</span>
+          <span className="text-[16px] font-extrabold tracking-[-0.02em] text-[var(--accent)] leading-none">Sketch</span>
         </div>
       </Link>
 
@@ -162,8 +163,8 @@ export function TopNav({ onOpenCommandPalette }: { onOpenCommandPalette?: () => 
             !isWebsite
               ? {
                   background: "var(--accent)",
-                  color: "#fff",
-                  boxShadow: "0 0 12px -2px rgba(108, 71, 255, 0.6)",
+                  color: "var(--on-accent)",
+                  boxShadow: "0 0 12px -2px var(--accent-glow)",
                 }
               : { color: "var(--text-secondary)" }
           }
@@ -177,8 +178,8 @@ export function TopNav({ onOpenCommandPalette }: { onOpenCommandPalette?: () => 
             isWebsite
               ? {
                   background: "var(--accent)",
-                  color: "#fff",
-                  boxShadow: "0 0 12px -2px rgba(108, 71, 255, 0.6)",
+                  color: "var(--on-accent)",
+                  boxShadow: "0 0 12px -2px var(--accent-glow)",
                 }
               : { color: "var(--text-secondary)" }
           }
@@ -194,7 +195,7 @@ export function TopNav({ onOpenCommandPalette }: { onOpenCommandPalette?: () => 
           className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-[8px] text-[12px] w-[240px] btn-secondary !justify-start"
           style={{ color: "var(--text-secondary)" }}
         >
-          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className="text-[#A78BFA] shrink-0" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className="text-[var(--accent-text)] shrink-0" aria-hidden="true">
             <path
               d="M9 16A7 7 0 1 0 9 2a7 7 0 0 0 0 14Zm10 3-4.35-4.35"
               stroke="currentColor"
@@ -209,25 +210,30 @@ export function TopNav({ onOpenCommandPalette }: { onOpenCommandPalette?: () => 
 
       <div className="flex-1" />
 
+      {/* Theme: light ⇄ dark. Same control as the website navbar, and it is
+          here (not only on /overview) because the console is the surface people
+          stare at longest. */}
+      <ThemeToggle />
+
       {/* Previously joined groups */}
       <JoinedGroupsMenu />
 
       {/* Collector Live Status Chip */}
       <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium font-mono px-2.5 py-1 rounded-full shrink-0 ts-numeric" style={{ color: "var(--text-secondary)", background: "var(--bg-surface-2)", border: "1px solid var(--border)" }}>
         <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-[#10B981]" />
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "var(--live)" }} />
+          <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: "var(--live)" }} />
         </span>
         <span>127.0.0.1:4000</span>
       </div>
 
       {/* Dev User Pill */}
       <div
-        className="w-[28px] h-[28px] rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+        className="w-[28px] h-[28px] rounded-full flex items-center justify-center text-[11px] font-bold text-[var(--text-primary)] shrink-0"
         style={{
-          background: "linear-gradient(135deg, #6C47FF 0%, #4F2BE3 100%)",
-          border: "1px solid rgba(108, 71, 255, 0.5)",
-          boxShadow: "0 0 10px -2px rgba(108, 71, 255, 0.6)",
+          background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-grad-2) 100%)",
+          border: "1px solid var(--accent-glow)",
+          boxShadow: "0 0 10px -2px var(--accent-glow)",
         }}
         title={`Instance: ${instanceId}`}
       >

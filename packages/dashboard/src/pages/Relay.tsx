@@ -7,6 +7,8 @@ import {
   getGroupHistory,
   recordGroupHistory,
   markGroupJoined,
+  setGroupMembership,
+  deleteGroupHistory,
   type GroupHistoryRow,
 } from "../api/client";
 import { ErrorState } from "../components/EmptyState";
@@ -112,6 +114,19 @@ function isHistoryType(type: MessageType | undefined): type is HistoryEntryType 
   return type === "note" || type === "trace_share" || type === "replay_result";
 }
 
+/**
+ * Types worth keeping in the LOCAL permanent record (collector SQLite).
+ *
+ * Narrower than isHistoryType() on purpose. The relay archives the whole
+ * conversation, notes included, and the History tab renders all of it — but a
+ * local trace_share/replay_result is the only thing that outlives the relay's
+ * 6h TTL, and notes are not worth that disk. Keeping this separate from
+ * isHistoryType() is what lets notes stay visible while staying out of SQLite.
+ */
+function isLocallyRetainedType(type: MessageType | undefined): boolean {
+  return type === "trace_share" || type === "replay_result";
+}
+
 /** Adapt a collector group_history row into the shared History shape. */
 function rowToHistoryEntry(row: GroupHistoryRow): HistoryEntry | null {
   if (!isHistoryType(row.entry_type as MessageType)) return null;
@@ -168,7 +183,7 @@ function CodeDisplay({ code }: { code: string }) {
   return (
     <div className="flex items-center gap-3">
       <div className="px-4 py-1.5 rounded-[8px]" style={{ background: "var(--bg-page)", border: "1px solid var(--border)" }}>
-        <span className="text-[26px] ts-mono font-bold tracking-[0.28em] text-white select-all">{code}</span>
+        <span className="text-[26px] ts-mono font-bold tracking-[0.28em] text-[var(--text-primary)] select-all">{code}</span>
       </div>
       <CopyButton value={code} className="btn-secondary !py-2 !px-3.5" copiedLabel="Copied!" title="Copy group code">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -194,12 +209,30 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
   const RELAY_BASE = getRelayBase();
   /** ?group=CODE opens a past group's archived history (from the navbar list). */
   const archiveCode = searchParams.get("group");
+  /**
+   * Reached from the navbar's group list, i.e. a session that has already
+   * ended. There is no live conversation behind it, so the Live tab is not
+   * offered at all - showing an empty "Live Discussion" beside a full history is
+   * just a dead end. Archive mode is history-only, permanently.
+   */
+  const isArchiveMode = archiveCode !== null;
 
   // ── State ──
   // Starts as "restoring" — the mount effect decides whether the relay still
   // honours the cached group code before anything is rendered.
-  const [pageState, setPageState] = useState<PageState>("restoring");
-  const [groupCode, setGroupCode] = useState<string | null>(() => localStorage.getItem(LS_KEY));
+  //
+  // Archive mode seeds every piece of state straight from ?group=CODE instead.
+  // It has to happen at mount rather than in the render-time sync below,
+  // because that sync only fires when archiveCode *changes* - on a fresh load
+  // of /relay?group=CODE it never runs, which previously left the page stuck on
+  // "Restoring session…" forever (the mount effect returns early in archive
+  // mode, so nothing else ever moved pageState off "restoring").
+  const [pageState, setPageState] = useState<PageState>(() =>
+    isArchiveMode ? "in-group" : "restoring",
+  );
+  const [groupCode, setGroupCode] = useState<string | null>(
+    () => archiveCode ?? localStorage.getItem(LS_KEY),
+  );
   const [messages, setMessages] = useState<RelayMessage[]>([]);
   const [messageInput, setMessageInput] = useState("");
   const [messageType, setMessageType] = useState<MessageType>("note");
@@ -207,7 +240,12 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
   const [sendError, setSendError] = useState<string | null>(null);
 
   // ── History state (relay group_history) ──
-  const [viewMode, setViewMode] = useState<ViewMode>("live");
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    isArchiveMode ? "history" : "live",
+  );
+
+  /** Archive mode is history-only; otherwise the Live/History switch decides. */
+  const showHistory = isArchiveMode || viewMode === "history";
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -230,6 +268,8 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
   const [joining, setJoining] = useState(false);
   const [creating, setCreating] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const feedRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -292,6 +332,12 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
   // Shared by the mount-time validation and the socket's group-error event, so
   // an expired group always ends up in the same clean state.
   const abandonGroup = useCallback((reason: string | null) => {
+    // The session is over from this machine's point of view — expired, ended by
+    // the creator, or closed by the user — so the collector's archiver should
+    // stop holding a relay room open for it.
+    if (groupCode) {
+      void setGroupMembership(groupCode, false, { instanceId });
+    }
     socketRef.current?.disconnect();
     socketRef.current = null;
     localStorage.removeItem(LS_KEY);
@@ -301,7 +347,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
     setHistoryError(null);
     setLeaveError(reason);
     setPageState("no-group");
-  }, []);
+  }, [groupCode, instanceId]);
 
   // ── Connect socket ──
   const connectSocket = useCallback(    (code: string) => {
@@ -337,6 +383,31 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
               },
             ])
           );
+
+          // Mirror into the collector's local SQLite group_history so this
+          // machine keeps its own permanent copy.
+          //
+          // Gated on isLocallyRetainedType(), NOT isHistoryType(): notes are
+          // part of the conversation the History tab shows (the relay keeps
+          // them), but only trace_share/replay_result are worth keeping
+          // locally. The collector enforces the same rule again on write, so
+          // this gate is convenience rather than the actual guarantee.
+          if (isLocallyRetainedType(type)) {
+            void recordGroupHistory(
+              {
+                group_code: msg.groupCode ?? code,
+                instance_id: msg.instanceId,
+                entry_type: type,
+                trace_id: null,
+                data: msg.summaryText,
+                // The relay's message id. The collector's own relay socket is
+                // archiving this same broadcast, so this key is what stops the
+                // two writers producing two rows for one message.
+                source_id: msg.id ?? null,
+              },
+              { instanceId }
+            );
+          }
         }
       });
 
@@ -413,6 +484,9 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
       // Record membership so this group shows up in the navbar history list,
       // even if this instance only ever sent plain notes.
       void markGroupJoined(code, { instanceId });
+      // Tell the collector to hold a relay socket for this group, so the local
+      // permanent record keeps filling in with no tab open.
+      void setGroupMembership(code, true, { instanceId });
     },
     [fetchHistory, fetchGroupHistory, connectSocket, instanceId]
   );
@@ -601,30 +675,49 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
         setSendError(data.message ?? `HTTP ${res.status}`);
         return;
       }
-      // Mirror into the collector's local group_history. The durable record is
-      // written by the relay itself when it accepts this message — a browser
-      // write only reaches this machine's collector, so the peer would never
-      // see it. This call is best-effort local bookkeeping and is allowed to
-      // fail. The relay payload carries no trace id, so trace_id stays null and
-      // the Trace Detail link stays hidden until one is actually available.
-      if (isHistoryType(messageType)) {
-        void recordGroupHistory(
-          {
-            group_code: groupCode,
-            instance_id: instanceId,
-            entry_type: messageType,
-            trace_id: null,
-            data: text,
-          },
-          { instanceId }
-        );
-      }
+      // No local mirror write here on purpose. The relay echoes every accepted
+      // message back to the whole room, sender included, so the socket handler
+      // below mirrors each message exactly once. Writing on both paths would
+      // double every row this machine sends.
       // Don't add to feed here — wait for the socket group-message event
       setMessageInput("");
     } catch {
       // Send failed silently — could add error toast later
     } finally {
       setSending(false);
+    }
+  };
+
+  // ── Delete archived history ──
+  // Only reachable in archive mode: the session behind this view has ended, so
+  // there is nothing live that could still be writing into it.
+  const handleDeleteHistory = async () => {
+    if (!groupCode) return;
+
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+
+    setDeleting(true);
+    setConfirmDelete(false);
+    try {
+      const result = await deleteGroupHistory(groupCode, { instanceId });
+      if (!result.ok) {
+        setLeaveError(`Could not delete history — ${result.message}`);
+        return;
+      }
+      setHistory([]);
+      setHistoryError(null);
+      setLeaveError(null);
+      // Back to the navbar list, which no longer contains this group.
+      setSearchParams({});
+      setPageState("no-group");
+      setGroupCode(null);
+    } catch (e) {
+      setLeaveError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -641,6 +734,10 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
       });
       const data = (await res.json().catch(() => ({}))) as { message?: string };
       if (!res.ok) throw new Error(data.message ?? `HTTP ${res.status}`);
+
+      // Stop the collector's archiver before tearing down our own socket, so it
+      // doesn't keep a room open for a session this machine has left.
+      void setGroupMembership(groupCode, false, { instanceId });
 
       socketRef.current?.disconnect();
       socketRef.current = null;
@@ -791,18 +888,51 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {archiveCode ? (
-            // No live session to leave — this just closes the archive view.
-            <button
-              onClick={() => {
-                setSearchParams({});
-                setPageState("no-group");
-                setGroupCode(null);
-                setHistory([]);
-              }}
-              className="btn-secondary shrink-0"
-            >
-              ← Back
-            </button>
+            <>
+              {/* Two-step: the icon arms, a second click confirms. Deleting an
+                  archive is destructive and the row is the only record left
+                  once the relay's group has expired, so it is never one click. */}
+              <button
+                onClick={handleDeleteHistory}
+                disabled={deleting}
+                className={
+                  confirmDelete
+                    ? "btn-destructive shrink-0"
+                    : "btn-secondary shrink-0 !px-2.5 !py-1.5"
+                }
+                title={
+                  confirmDelete
+                    ? "Click again to permanently delete this archive"
+                    : "Delete this group's archived history"
+                }
+                aria-label="Delete group history"
+              >
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path
+                    d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.6-8"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                {confirmDelete && (
+                  <span>{deleting ? "Deleting…" : "Delete for good?"}</span>
+                )}
+              </button>
+              {/* No live session to leave — this just closes the archive view. */}
+              <button
+                onClick={() => {
+                  setSearchParams({});
+                  setPageState("no-group");
+                  setGroupCode(null);
+                  setHistory([]);
+                }}
+                className="btn-secondary shrink-0"
+              >
+                ← Back
+              </button>
+            </>
           ) : (
             <button onClick={handleLeave} disabled={leaving} className="btn-destructive shrink-0">
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -832,46 +962,50 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
             <span
               className="w-2 h-2 rounded-full shrink-0"
               style={
-                viewMode === "live"
-                  ? { background: "#10B981", boxShadow: "0 0 6px #10B981" }
-                  : { background: "var(--text-dim)" }
+                showHistory
+                  ? { background: "var(--text-dim)" }
+                  : { background: "var(--green)" }
               }
             />
             <span className="ts-card-title">
-              {viewMode === "live" ? "Live Discussion" : "Group History"}
+              {showHistory ? "Group History" : "Live Discussion"}
             </span>
-            <div className="ts-segmented shrink-0" role="radiogroup" aria-label="Relay view">
-              <button
-                type="button"
-                role="radio"
-                aria-checked={viewMode === "live"}
-                onClick={() => setViewMode("live")}
-                className="ts-segment"
-                title="Real-time relay feed"
-              >
-                Live
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={viewMode === "history"}
-                onClick={() => setViewMode("history")}
-                className="ts-segment"
-                title="Archived session messages and shared traces"
-              >
-                History
-              </button>
-            </div>
+            {/* No Live/History switch in archive mode: the session is over, so
+                there is nothing live to switch to. */}
+            {!isArchiveMode && (
+              <div className="ts-segmented shrink-0" role="radiogroup" aria-label="Relay view">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={!showHistory}
+                  onClick={() => setViewMode("live")}
+                  className="ts-segment"
+                  title="Real-time relay feed"
+                >
+                  Live
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={showHistory}
+                  onClick={() => setViewMode("history")}
+                  className="ts-segment"
+                  title="Archived session messages and shared traces"
+                >
+                  History
+                </button>
+              </div>
+            )}
           </div>
           <Badge tone="neutral">
-            <span className="ts-numeric">{viewMode === "live" ? messages.length : history.length}</span>{" "}
-            {viewMode === "live"
-              ? `message${messages.length !== 1 ? "s" : ""}`
-              : `entr${history.length !== 1 ? "ies" : "y"}`}
+            <span className="ts-numeric">{showHistory ? history.length : messages.length}</span>{" "}
+            {showHistory
+              ? `entr${history.length !== 1 ? "ies" : "y"}`
+              : `message${messages.length !== 1 ? "s" : ""}`}
           </Badge>
         </div>
 
-        {viewMode === "history" ? (
+        {showHistory ? (
           // ── History panel ──
           <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2.5 min-h-0 ts-scroll-fade" aria-label="Group history">
             {historyLoading ? (
@@ -910,7 +1044,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
                     <path d="M3 3v5h5M21 21v-5h-5M3.5 13a8.5 8.5 0 0 1 14-5.7M20.5 11a8.5 8.5 0 0 1-14 5.7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
                 </div>
-                <p className="text-[13px] font-medium text-slate-300">No archived messages yet</p>
+                <p className="text-[13px] font-medium text-[var(--text-secondary)]">No archived messages yet</p>
                 <p className="text-[12px] max-w-[300px]">
                   Every message sent in this session is recorded here, including shared traces and replay results.
                 </p>
@@ -938,7 +1072,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
                     </span>
                   </div>
 
-                  <p className="text-[13px] leading-relaxed break-words" style={{ color: "#E2E8F0" }}>
+                  <p className="text-[13px] leading-relaxed break-words" style={{ color: "var(--text-primary)" }}>
                     {entry.summary}
                   </p>
 
@@ -973,7 +1107,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
                 </svg>
               </div>
-              <p className="text-[13px] font-medium text-slate-300">No messages yet in this group</p>
+              <p className="text-[13px] font-medium text-[var(--text-secondary)]">No messages yet in this group</p>
               <p className="text-[12px] max-w-[280px]">
                 Send a note, share a trace, or test real-time collaboration with your peer.
               </p>
@@ -1031,10 +1165,10 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
                     }`}
                     style={
                       isCrazy
-                        ? { borderColor: "var(--red-border)", background: "var(--red-bg)", color: "#FDA4AF", boxShadow: "0 0 12px rgba(244, 63, 94, 0.12)" }
+                        ? { borderColor: "var(--red-border)", background: "var(--red-bg)", color: "var(--red)", boxShadow: "0 0 12px var(--red-glow)" }
                         : isMe
-                        ? { background: "rgba(108, 71, 255, 0.16)", border: "1px solid var(--border-accent)", color: "var(--text-primary)" }
-                        : { background: "var(--bg-surface-3)", border: "1px solid var(--border)", color: "#E2E8F0" }
+                        ? { background: "var(--accent-light)", border: "1px solid var(--border-accent)", color: "var(--text-primary)" }
+                        : { background: "var(--bg-surface-3)", border: "1px solid var(--border)", color: "var(--text-primary)" }
                     }
                   >
                     {msg.summaryText}
@@ -1047,7 +1181,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
         )}
 
         {/* Mode selector */}
-        {viewMode === "live" && (
+        {!showHistory && (
         <div className="px-4 py-2 flex items-center justify-between gap-2 flex-wrap shrink-0" style={{ background: "var(--bg-surface-2)", borderTop: "1px solid var(--border-dim)" }}>
           <div className="flex items-center gap-1.5">
             <span className="ts-overline shrink-0 mr-1">Mode</span>
@@ -1071,7 +1205,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
             </div>
           </div>
           {messageType === "crazy" && (
-            <span className="text-[10px] italic" style={{ color: "#FDA4AF" }}>
+            <span className="text-[10px] italic" style={{ color: "var(--red)" }}>
               temporary — disappears on reload
             </span>
           )}
@@ -1079,7 +1213,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
         )}
 
         {/* Send input bar */}
-        {viewMode === "live" && (
+        {!showHistory && (
         <div className="px-4 py-3 flex items-center gap-2.5 shrink-0" style={{ background: "var(--bg-surface-2)", borderTop: "1px solid var(--border-dim)" }}>
           <input
             type="text"
@@ -1111,7 +1245,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
         </div>
         )}
 
-        {sendError && viewMode === "live" && (
+        {sendError && !showHistory && (
           <p role="alert" className="px-4 pb-2 text-[11px] shrink-0 ts-toast" style={{ color: "var(--red)", background: "var(--bg-surface-2)" }}>
             {sendError}
           </p>

@@ -488,22 +488,22 @@ export function TraceDetail() {
             <div className="mt-3 ts-pop grid grid-cols-1 sm:grid-cols-2 gap-2.5" aria-live="polite">
               <div className="rounded-[9px] p-3" style={{ background: "var(--bg-surface-2)", border: "1px solid var(--border-dim)" }}>
                 <div className="ts-overline mb-1.5">Original</div>
-                <div className="ts-mono text-[12px] ts-numeric text-slate-300">
-                  status_code: <span className="text-white font-semibold">{replayResult.original.status_code}</span>
+                <div className="ts-mono text-[12px] ts-numeric text-[var(--text-secondary)]">
+                  status_code: <span className="text-[var(--text-primary)] font-semibold">{replayResult.original.status_code}</span>
                 </div>
-                <div className="ts-mono text-[12px] ts-numeric text-slate-300">
-                  duration_ms: <span className="text-white font-semibold">{replayResult.original.duration_ms}</span>
+                <div className="ts-mono text-[12px] ts-numeric text-[var(--text-secondary)]">
+                  duration_ms: <span className="text-[var(--text-primary)] font-semibold">{replayResult.original.duration_ms}</span>
                 </div>
               </div>
               <div className="rounded-[9px] p-3" style={{ background: "var(--accent-light)", border: "1px solid var(--border-accent)" }}>
                 <div className="ts-overline mb-1.5" style={{ color: "var(--accent-text)" }}>
                   Replay
                 </div>
-                <div className="ts-mono text-[12px] ts-numeric text-slate-300">
-                  status_code: <span className="text-white font-semibold">{replayResult.replay.status_code}</span>
+                <div className="ts-mono text-[12px] ts-numeric text-[var(--text-secondary)]">
+                  status_code: <span className="text-[var(--text-primary)] font-semibold">{replayResult.replay.status_code}</span>
                 </div>
-                <div className="ts-mono text-[12px] ts-numeric text-slate-300">
-                  duration_ms: <span className="text-white font-semibold">{replayResult.replay.duration_ms}</span>
+                <div className="ts-mono text-[12px] ts-numeric text-[var(--text-secondary)]">
+                  duration_ms: <span className="text-[var(--text-primary)] font-semibold">{replayResult.replay.duration_ms}</span>
                 </div>
               </div>
             </div>
@@ -594,7 +594,7 @@ export function TraceDetail() {
                   style={{ ["--stagger-i" as string]: Math.min(i, 8), borderBottom: "1px solid var(--border-dim)" }}
                 >
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="text-[13px] font-medium text-white">{r.name}</span>
+                    <span className="text-[13px] font-medium text-[var(--text-primary)]">{r.name}</span>
                     <StatusBadge code={r.expected_status} showDot={false} />
                     <span className="text-[11px] ts-mono ts-numeric" style={{ color: "var(--text-dim)" }}>
                       {absoluteTime(r.created_at)}
@@ -615,7 +615,7 @@ export function TraceDetail() {
                     {rowState.result && (
                       <div className="inline-flex items-center gap-2 ts-pop">
                         <ResultBadge status={rowState.result.passed ? "success" : "fail"} label={rowState.result.passed ? "PASS" : "FAIL"} />
-                        <span className="text-[11px] text-slate-400 ts-mono ts-numeric">
+                        <span className="text-[11px] text-[var(--text-dim)] ts-mono ts-numeric">
                           expected: {rowState.result.expected_status}, actual: {rowState.result.actual_status}
                         </span>
                       </div>
@@ -751,7 +751,7 @@ export function TraceDetail() {
         )}
 
         {loadingEvents ? (
-          <div className="p-4 text-[13px] text-slate-400">Loading events…</div>
+          <div className="p-4 text-[13px] text-[var(--text-dim)]">Loading events…</div>
         ) : events.length === 0 ? (
           <EmptyState title="No events" description="No events were recorded for this trace." />
         ) : (
@@ -770,9 +770,9 @@ export function TraceDetail() {
                   .sort((a, b) => a.created_at - b.created_at)
                   .map((ev, i) => (
                     <tr key={ev.id} className="ts-stagger" style={{ ["--stagger-i" as string]: Math.min(i, 10) }}>
-                      <td className="ts-mono text-[12px] text-white">{ev.service}</td>
-                      <td className="text-slate-300">{ev.operation}</td>
-                      <td className="ts-mono text-[12px] ts-numeric text-slate-200">{ev.duration_ms} ms</td>
+                      <td className="ts-mono text-[12px] text-[var(--text-primary)]">{ev.service}</td>
+                      <td className="text-[var(--text-secondary)]">{ev.operation}</td>
+                      <td className="ts-mono text-[12px] ts-numeric text-[var(--text-secondary)]">{ev.duration_ms} ms</td>
                       <td>
                         <span
                           className="inline-flex px-2 py-0.5 rounded-[5px] text-[10px] font-semibold font-mono uppercase"

@@ -48,7 +48,7 @@ export function ReplaySection({
         className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-[5px] text-[13px] font-semibold disabled:opacity-60"
         style={{
           background: "var(--accent)",
-          color: "#ffffff",
+          color: "var(--on-accent)",
           border: "none",
           cursor: loading ? "wait" : "pointer",
         }}
@@ -83,7 +83,7 @@ export function ReplaySection({
             className="shrink-0 px-4 py-2 rounded-[5px] text-[13px] font-semibold disabled:opacity-60"
             style={{
               background: "var(--accent)",
-              color: "#ffffff",
+              color: "var(--on-accent)",
               border: "none",
               cursor: loading ? "wait" : "pointer",
               height: "32px",
