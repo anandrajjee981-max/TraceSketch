@@ -9,10 +9,10 @@ function getApiBase(): string {
 }
 
 // Relay server base URL — separate Express + Socket.io + MongoDB backend.
-// Override via VITE_RELAY_URL env var; defaults to http://localhost:7000 for local dev.
+// Override via VITE_RELAY_URL env var; defaults to https://tracesketch.onrender.com for prod.
 export function getRelayBase(): string {
   const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
-  const RELAY_BASE_URL = env?.VITE_RELAY_URL ?? "http://localhost:7000";
+  const RELAY_BASE_URL = env?.VITE_RELAY_URL ?? "https://tracesketch.onrender.com";
   return RELAY_BASE_URL.replace(/\/$/, "");
 }
 

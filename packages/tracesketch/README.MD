@@ -220,7 +220,7 @@ Built by Anand Raj.
 
 - GitHub: [github.com/anandrajjee981-max](https://github.com/anandrajjee981-max)
 - LinkedIn: [linkedin.com/in/anand-raj-059011387](https://www.linkedin.com/in/anand-raj-059011387/)
-
+- Instagram :[instagram.com/anand_raj9435/](https://www.instagram.com/anand_raj9435/)
 ## License
 
 MIT

@@ -36,7 +36,7 @@ import { getOrCreateInstance } from "./service/instance.service";
  *     stranger's conversation.
  */
 
-const RELAY_URL = process.env.TRACESKETCH_RELAY_URL ?? "http://localhost:7000";
+const RELAY_URL = process.env.TRACESKETCH_RELAY_URL ?? "https://tracesketch.onrender.com";
 
 /** Broadcast payload; matches StoredMessage on the relay. */
 type RelayMessage = {
