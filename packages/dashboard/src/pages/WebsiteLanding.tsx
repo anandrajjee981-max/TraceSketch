@@ -700,7 +700,7 @@ function Simulator() {
                     type="button"
                     onClick={() => setRedact((v) => !v)}
                     aria-pressed={redact}
-                    className={`nb-chip ${redact ? "!bg-[var(--green)] !text-white" : "!bg-[var(--red)] !text-white"}`}
+                    className={`nb-chip ${redact ? "!bg-[var(--green)] !text-[var(--on-green)]" : "!bg-[var(--red)] !text-[var(--on-red)]"}`}
                   >
                     {redact ? "Redaction ON" : "Redaction OFF"}
                   </button>
@@ -1099,7 +1099,7 @@ function Comparison() {
                 <th scope="col">Sentry</th>
                 <th
                   scope="col"
-                  className="!bg-[var(--accent)] !text-white"
+                  className="bg-accent-grad !text-[var(--on-accent)]"
                 >
                   TraceSketch
                 </th>

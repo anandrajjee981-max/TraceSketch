@@ -61,12 +61,12 @@ function IconSettings({ active }: { active?: boolean }) {
   );
 }
 
-function IconGlobe({ active }: { active?: boolean }) {
+function IconCli({ active }: { active?: boolean }) {
   const stroke = active ? "var(--accent)" : "var(--text-secondary)";
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0">
-      <circle cx="8" cy="8" r="6" stroke={stroke} strokeWidth="1.3" />
-      <path d="M2.5 8h11M8 2a9 9 0 0 1 0 12M8 2a9 9 0 0 0 0 12" stroke={stroke} strokeWidth="1.2" />
+      <path d="M3 3.8L5.8 7.3 3 10.8" stroke={stroke} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7.8 12.2H13" stroke={stroke} strokeWidth="1.3" strokeLinecap="round" />
     </svg>
   );
 }
@@ -76,6 +76,7 @@ const NAV = [
   { to: "/replays", label: "Replays", Icon: IconReplay, end: false },
   { to: "/regressions", label: "Regressions", Icon: IconRegression, end: false },
   { to: "/relay", label: "Relay", Icon: IconRelay, end: false },
+  { to: "/cli", label: "CLI", Icon: IconCli, end: false },
   { to: "/settings", label: "Settings", Icon: IconSettings, end: false },
 ] as const;
 
@@ -102,7 +103,7 @@ function NavItem({
           {!collapsed && (
             <span className="flex items-center justify-between flex-1 min-w-0">
               <span className="truncate">{label}</span>
-              {badge && <span className="badge-angular badge-angular-accent">{badge}</span>}
+              {badge && <span className="badge-angular badge-angular-cyan">{badge}</span>}
             </span>
           )}
         </span>
@@ -166,27 +167,40 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           <div className="ts-divider" />
         </div>
 
-        <NavItem
+        {/* <NavItem
           to="/overview"
           label="Product Website"
           Icon={IconGlobe}
           end={false}
           collapsed={collapsed}
           badge="NEW"
-        />
+        /> */}
       </nav>
 
-      {/* Local-First status card */}
+      {/* Local-First status card — emerald is the "live & local" voice, the
+          same one used for the collector dot in the top bar. */}
       {!collapsed && (
         <div className="mt-auto p-3 m-2 rounded-[8px] ts-card" style={{ background: "var(--bg-surface-2)" }}>
           <div className="flex items-center gap-2 mb-1">
-            <span className="w-2 h-2 rounded-full bg-[var(--green)]" />
+            <span
+              className="relative flex h-2 w-2 shrink-0"
+              aria-hidden="true"
+            >
+              <span
+                className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                style={{ background: "var(--live)" }}
+              />
+              <span
+                className="relative inline-flex rounded-full h-2 w-2"
+                style={{ background: "var(--live)" }}
+              />
+            </span>
             <span className="text-[11px] font-mono font-bold text-[var(--text-primary)]">Local-First Mode</span>
           </div>
           <p className="text-[10px] text-[var(--text-dim)] font-sans leading-tight">
             SQLite database active. 0 cloud telemetry sent.
           </p>
-          <div className="mt-2 text-[9px] text-[var(--accent-text)] font-mono">
+          <div className="mt-2 text-[9px] text-[var(--cyan-text)] font-mono">
             Press <kbd className="ts-kbd">⌘K</kbd> for quick actions
           </div>
         </div>

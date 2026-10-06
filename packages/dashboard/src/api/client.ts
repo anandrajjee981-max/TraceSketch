@@ -449,7 +449,122 @@ export async function markGroupJoined(
     if (!res.ok) {
       console.warn(`[history] collector mirror rejected join marker for ${groupCode}: HTTP ${res.status}`);
     }
+} catch (err) {
+    console.warn(`[history] collector mirror unreachable for join marker ${groupCode}:`, err);
+  }
+}
+
+/* ---- Console (sketch CLI equivalent) ---- */
+
+/**
+ * Split a requested path into the bare path and its query params.
+ *
+ * Mirrors the CLI's recordToCollector splitting (packages/cli/src/index.ts:129-146)
+ * including its quirk: when the caller's path carries a "?", that string wins
+ * over the parsed URL pathname, because a target given as a bare host can put a
+ * different prefix in front of the same query string.
+ */
+function splitPathAndQuery(routePath: string, fullUrl: string): {
+  pathOnly: string;
+  queryParams: Record<string, string>;
+} {
+  let pathOnly = routePath;
+  const queryParams: Record<string, string> = {};
+
+  try {
+    const url = new URL(fullUrl);
+    url.searchParams.forEach((v, k) => {
+      queryParams[k] = v;
+    });
+    pathOnly = url.pathname;
+    if (routePath.includes("?")) {
+      pathOnly = routePath.split("?")[0];
+    }
+  } catch {
+    if (routePath.includes("?")) {
+      pathOnly = routePath.split("?")[0];
+      const qs = routePath.split("?")[1];
+      try {
+        new URLSearchParams(qs).forEach((v, k) => {
+          queryParams[k] = v;
+        });
+      } catch {
+        // unparseable query string — record the path alone
+      }
+    }
+  }
+
+  return { pathOnly, queryParams };
+}
+
+/**
+ * Persist a trace for a request sent from the Console page.
+ *
+ * This is the browser equivalent of the CLI's recordToCollector step. Without
+ * it, requests only reach the Traces page when the target app happens to run
+ * the traceSketch SDK — a Console aimed at a plain app, or at a failed
+ * connection, would leave no trace at all.
+ *
+ * Runs on both the success and failure paths, exactly like the CLI, so a
+ * connection refusal still shows up (coerced to 502, which is what the CLI
+ * records). Never throws: a dead collector must not take down the response
+ * panel, so failures come back as a message for the panel to render.
+ *
+ * Goes through apiUrl() rather than a hardcoded localhost:4000, which means dev
+ * uses the same-origin Vite proxy and needs no CORS preflight for this call.
+ */
+export async function recordConsoleTrace(
+  payload: {
+    method: string;
+    routePath: string;
+    fullUrl: string;
+    statusCode: number;
+    duration: number;
+    body?: string;
+  },
+  opts?: { instanceId?: string; apiBaseUrl?: string }
+): Promise<{ ok: true; traceId?: string } | { ok: false; message: string }> {
+  const { pathOnly, queryParams } = splitPathAndQuery(payload.routePath, payload.fullUrl);
+
+  // Mirrors the CLI: a body is parsed into JSON when it can be, kept as a raw
+  // string when it can't, and an absent body becomes {} rather than null.
+  let parsedBody: unknown;
+  if (payload.body) {
+    try {
+      parsedBody = JSON.parse(payload.body);
+    } catch {
+      parsedBody = payload.body;
+    }
+  } else {
+    parsedBody = {};
+  }
+
+  try {
+    const res = await fetch(apiUrl("/traces", opts?.apiBaseUrl), {
+      method: "POST",
+      headers: headers(opts?.instanceId),
+      body: JSON.stringify({
+        method: payload.method,
+        path: pathOnly,
+        status_code: payload.statusCode,
+        duration: payload.duration,
+        // Same environment label the CLI stamps, so Console-sent traces are
+        // indistinguishable from real CLI ones in the Traces filter.
+        environment: "cli",
+        request_headers: { "content-type": "application/json", "user-agent": "sketch-cli" },
+        request_body: parsedBody,
+        query_params: queryParams,
+      }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return { ok: false, message: `collector responded ${res.status}: ${text || res.statusText} — trace not saved` };
+    }
+
+    const json = (await res.json().catch(() => null)) as { trace_id?: string } | null;
+    return { ok: true, traceId: json?.trace_id };
   } catch (err) {
-    console.warn(`[history] collector mirror unreachable for ${groupCode}:`, err);
+    return { ok: false, message: `could not reach collector — is \`npx tracesketch start\` running? ${err instanceof Error ? err.message : String(err)}` };
   }
 }

@@ -55,7 +55,7 @@ function applyTheme(theme: Theme) {
   root.style.colorScheme = theme;
   // Keep the mobile browser chrome / PWA title bar matching the active ground.
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", theme === "dark" ? "#0b0b11" : "#faf8f5");
+  if (meta) meta.setAttribute("content", theme === "dark" ? "#0b0c10" : "#faf8f5");
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

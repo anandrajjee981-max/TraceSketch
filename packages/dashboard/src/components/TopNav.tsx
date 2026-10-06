@@ -21,12 +21,24 @@ function JoinedGroupsMenu() {
   const [error, setError] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Refetch on every open rather than caching the first result.
+  //
+  // This list changes without any interaction on this page: a group is deleted
+  // from the archive view, a session expires and drops out of the relay, or a
+  // peer archives the same code. The previous `groups !== null` guard fetched
+  // once and then never again for the life of the component, so the menu kept
+  // showing groups that had already been deleted until a hard reload.
+  //
+  // `groups` is deliberately absent from the deps — it is written here, and
+  // depending on it would re-fire this effect on every response and loop.
   useEffect(() => {
-    if (!open || groups !== null) return;
+    if (!open) return;
     let cancelled = false;
     listMyGroups({ instanceId })
       .then((data) => {
-        if (!cancelled) setGroups(data.groups ?? []);
+        if (cancelled) return;
+        setGroups(data.groups ?? []);
+        setError(false);
       })
       .catch(() => {
         if (!cancelled) setError(true);
@@ -34,7 +46,7 @@ function JoinedGroupsMenu() {
     return () => {
       cancelled = true;
     };
-  }, [open, groups, instanceId]);
+  }, [open, instanceId]);
 
   // Close on outside click / Escape.
   useEffect(() => {
@@ -162,9 +174,9 @@ export function TopNav({ onOpenCommandPalette }: { onOpenCommandPalette?: () => 
           style={
             !isWebsite
               ? {
-                  background: "var(--accent)",
+                  background: "var(--accent-grad)",
                   color: "var(--on-accent)",
-                  boxShadow: "0 0 12px -2px var(--accent-glow)",
+                  boxShadow: "var(--accent-shadow)",
                 }
               : { color: "var(--text-secondary)" }
           }
@@ -177,9 +189,9 @@ export function TopNav({ onOpenCommandPalette }: { onOpenCommandPalette?: () => 
           style={
             isWebsite
               ? {
-                  background: "var(--accent)",
+                  background: "var(--accent-grad)",
                   color: "var(--on-accent)",
-                  boxShadow: "0 0 12px -2px var(--accent-glow)",
+                  boxShadow: "var(--accent-shadow)",
                 }
               : { color: "var(--text-secondary)" }
           }

@@ -57,6 +57,19 @@
   --accent-grad-2:  #9B6DFF;
   --accent-glow:    rgba(108, 71, 255, 0.35);
 
+  /* Primary action fill + bloom. On paper this is a violet gradient over a
+     crisp stamp shadow; in dark it becomes the electric indigo + neon glow.
+     Same two tokens, same call sites. */
+  --accent-grad:    linear-gradient(135deg, #5936E8, #6C47FF);
+  --accent-shadow:  var(--shadow-sm);
+
+  /* Cyan — secondary voice. Kept dark enough for 4.5:1 on cream, so the
+     NEW badge and secondary links stay legible instead of glowing. */
+  --cyan:           #0891B2;
+  --cyan-bg:        #DFF5FA;
+  --cyan-border:    #0891B2;
+  --cyan-text:      #0E6F8A;
+
   --flare:          #FF4D00;
   --flare-light:    #FFE9DF;
   /* Deep flare: white text on this passes 4.5:1, unlike --flare */
@@ -148,90 +161,118 @@
   --z-modal:        60;
 }
 
-/* ─── Dark Theme — "Midnight Blueprint" ────────────────────────────────── */
-/*
-  Not an inversion: the paper becomes deep slate and the ink becomes chalk, so
-  the brutalist contract (bright outline + hard offset shadow on every surface)
-  survives intact instead of turning into low-contrast mush. Only the ground
-  polarity flips; geometry, radii and stroke weight are untouched.
+/* ─── Dark Theme — "Electric Indigo" dev-tool console ───────────────────────
+  A deliberately different design language from the light theme, because a
+  developer-tool dashboard and a printed wireframe want opposite things:
 
-  Every token used by a component is re-declared here. A token that is NOT
-  overridden is a bug — it would silently keep its light value and produce the
-  "half-switched" contradiction this theme exists to prevent.
+    light = paper, 2px ink outlines, hard offset stamps, opaque fills
+    dark  = matte void, 1px glass hairlines, soft ambient depth, glowing fills
+
+  Both themes describe the same system through the same token names, so a
+  component never has to know which theme is active. Two tokens carry most of
+  the change-over:
+    --stroke   2px -> 1px   (ink rule -> glass hairline)
+    --shadow-* hard offset stamps -> soft ambient blur
+  Everything else is a re-declaration, and every token a component reads is
+  declared here: a token left at its light value is the "half-switched"
+  contradiction this block exists to prevent.
+
+  Glass: --bg-surface carries rgba(255,255,255,0.03), so every .ts-card /
+  .nb-card / .nb-panel becomes frosted from one token flip, with --border
+  providing the 1px rgba(255,255,255,0.08) edge.
 */
 :root.dark {
   color-scheme: dark;
 
-  /* Grounds: a graded stack so nested panels stay separable */
-  --bg-page:        #0b0b11;
-  --bg-surface:     #15151d;
-  --bg-surface-2:   #1d1d27;
-  --bg-surface-3:   #282834;
+  /* Grounds — matte, near-opaque page; surfaces float above it as glass */
+  --bg-page:        #0b0c10;
+  --bg-surface:     rgba(255, 255, 255, 0.03);
+  --bg-surface-2:   rgba(255, 255, 255, 0.05);
+  --bg-surface-3:   rgba(255, 255, 255, 0.08);
 
-  --bg-nav:         rgba(11, 11, 17, 0.82);
-  --bg-scrim:       rgba(0, 0, 0, 0.7);
-  --bg-code:        #101018;
-  --bg-glass:       rgba(21, 21, 29, 0.78);
+  --bg-nav:         rgba(11, 12, 16, 0.82);
+  --bg-scrim:       rgba(0, 0, 0, 0.72);
+  --bg-code:        rgba(255, 255, 255, 0.04);
+  --bg-glass:       rgba(11, 12, 16, 0.72);
 
-  /* "Ink" inverts to chalk. Because --border also feeds every hard shadow,
-     flipping this one token re-lights the whole shadow system automatically. */
-  --border:         #ededf2;
-  --border-dim:     rgba(237, 237, 242, 0.24);
-  --border-accent:  #ededf2;
+  /* Glass edge. rgba white keeps its meaning on any ground below it. */
+  --border:         rgba(255, 255, 255, 0.08);
+  --border-dim:     rgba(255, 255, 255, 0.06);
+  --border-accent:  rgba(255, 255, 255, 0.16);
 
-  --grid-line:      rgba(237, 237, 242, 0.06);
-  --grid-line-lg:   rgba(237, 237, 242, 0.09);
+  --grid-line:      rgba(255, 255, 255, 0.035);
+  --grid-line-lg:   rgba(255, 255, 255, 0.05);
 
-  /* Accents brighten so they stay legible on a dark ground; text-on-fill
-     inverts to ink, which is what makes the neon fills read as "high energy"
-     rather than as glowing mud. */
-  --accent:         #a288ff;
-  --accent-light:   #241c4d;
-  --accent-hover:   #b9a2ff;
-  --accent-text:    #b9a2ff;
-  --accent-grad-2:  #7a5cff;
-  --accent-glow:    rgba(162, 136, 255, 0.4);
+  /* Electric indigo. --accent is nudged off pure #6366F1 so it clears 4.5:1 as
+     *text* on the matte ground (4.39:1 fails at #6366F1), while the gradient
+     keeps the exact specified pair because it is only ever a fill. */
+  --accent:         #6d70f5;
+  --accent-light:   rgba(99, 102, 241, 0.16);
+  --accent-hover:   #818cf8;
+  --accent-text:    #a5b4fc;
+  --accent-grad-2:  #8b5cf6;
+  --accent-glow:    rgba(99, 102, 241, 0.4);
 
-  --flare:          #ff6a2b;
-  --flare-light:    #3a1a0c;
-  --flare-deep:     #ff8a4d;
-  --flare-deep-grad:#ff5a1f;
-  --flare-hover:    #ffa173;
+  /* Cyan — the secondary voice: NEW badges, secondary links, quiet highlights */
+  --cyan:           #22d3ee;
+  --cyan-bg:        rgba(6, 182, 212, 0.14);
+  --cyan-border:    rgba(6, 182, 212, 0.4);
+  --cyan-text:      #67e8f9;
 
-  --on-accent:      #0b0b11;
-  --on-flare:       #0b0b11;
-  --on-red:         #0b0b11;
-  --on-green:       #0b0b11;
-  --on-status:      #0b0b11;
+  --flare:          #f97316;
+  --flare-light:    rgba(249, 115, 22, 0.14);
+  --flare-deep:     #fb923c;
+  --flare-deep-grad:#8b5cf6;
+  --flare-hover:    #fdba74;
 
-  --text-primary:   #f2f1f5;
-  --text-secondary: #b4b3be;
-  --text-dim:       #8b8a96;
+  /* Fills here are light enough that ink beats white — 4.7:1 vs 5.3:1 against
+     the indigo gradient, and it keeps the neon looking lit rather than muddy. */
+  --on-accent:      #000000;
+  --on-flare:       #1a0d02;
+  --on-red:         #1a0206;
+  --on-green:       #00140c;
+  --on-status:      #000000;
 
-  --green:          #34d399;
-  --green-bg:       #0d2b1f;
-  --green-border:   #34d399;
+  --text-primary:   #e9edf5;
+  --text-secondary: #a9b2c3;
+  --text-dim:       #7d8798;
+
+  /* Emerald — live connections, "Local-First Mode", healthy results */
+  --live:           #10b981;
+  --green:          #10b981;
+  --green-bg:       rgba(16, 185, 129, 0.13);
+  --green-border:   rgba(16, 185, 129, 0.38);
   --green-text:     #6ee7b7;
 
-  --blue:           #60a5fa;
-  --blue-bg:        #10233f;
-  --blue-border:    #60a5fa;
-  --blue-text:      #93c5fd;
+  --blue:           #38bdf8;
+  --blue-bg:        rgba(56, 189, 248, 0.13);
+  --blue-border:    rgba(56, 189, 248, 0.38);
+  --blue-text:      #7dd3fc;
 
   --amber:          #fbbf24;
-  --amber-bg:       #33240a;
-  --amber-border:   #fbbf24;
+  --amber-bg:       rgba(251, 191, 36, 0.13);
+  --amber-border:   rgba(251, 191, 36, 0.38);
   --amber-text:     #fcd34d;
 
   --red:            #f87171;
-  --red-bg:         #3a1416;
-  --red-border:     #f87171;
+  --red-bg:         rgba(248, 113, 113, 0.13);
+  --red-border:     rgba(248, 113, 113, 0.38);
   --red-text:       #fca5a5;
 
-  --live:           #34d399;
-
+  /* ── Geometry: the glass system, not the stamp system ───────────────────
+     A hard 2px offset shadow reads as a printing error on a dark ground, so
+     depth switches to ambient blur and the outline thins to a hairline. */
+  --stroke:         1px;
+  --shadow-sm:      0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md:      0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-card:    0 2px 12px rgba(0, 0, 0, 0.45);
+  --shadow-glow:    0 12px 40px rgba(0, 0, 0, 0.6);
   --shadow-scrim:   rgba(0, 0, 0, 0.8);
-  --red-glow:       rgba(248, 113, 113, 0.16);
+  --red-glow:       rgba(248, 113, 113, 0.2);
+
+  /* Primary action treatment: electric indigo gradient with an indigo bloom. */
+  --accent-grad:    linear-gradient(135deg, #6366f1, #8b5cf6);
+  --accent-shadow:  0 0 15px rgba(99, 102, 241, 0.4);
 }
 
 /* Make Tailwind's `dark:` utilities follow the in-app toggle instead of the OS. */
@@ -377,6 +418,17 @@ body {
   }
 }
 
+/* ─── Utility ──────────────────────────────────────────────────────────── */
+/*
+  Gradient accent fill. This has to be a real class, not `bg-[var(--accent-grad)]`:
+  Tailwind compiles `bg-[...]` to `background-color`, which silently rejects a
+  gradient value, so the element kept its inherited white and ended up with
+  white-on-white text. `background` accepts both fill kinds.
+*/
+.bg-accent-grad {
+  background: var(--accent-grad);
+}
+
 /* ─── Component Primitives ─────────────────────────────────────────────── */
 /*
   Everything from here down lives in `@layer components`.
@@ -497,7 +549,9 @@ select {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: var(--accent);
+  /* Gradient fill + bloom come from tokens, so the primary CTA reads as the
+     electric indigo button in dark and the violet stamp on paper. */
+  background: var(--accent-grad);
   color: var(--on-accent);
   border: var(--stroke) solid var(--border);
   border-radius: var(--radius-full);
@@ -506,7 +560,7 @@ select {
   font-weight: 700;
   cursor: pointer;
   transition: all var(--dur-fast) var(--ease-out);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--accent-shadow);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
@@ -551,7 +605,7 @@ select {
   justify-content: center;
   gap: 6px;
   background: var(--red-bg);
-  color: var(--red);
+  color: var(--red-text);
   border: var(--stroke) solid var(--border);
   border-radius: var(--radius-full);
   padding: 7px 15px;
@@ -628,20 +682,27 @@ select {
   color: var(--on-accent);
   border: none;
 }
+/* "NEW" badge — the secondary voice, so it never competes with the indigo
+   primary CTA it sits next to. */
+.badge-angular-cyan {
+  background: var(--cyan-bg);
+  color: var(--cyan-text);
+  border: 1px solid var(--cyan-border);
+}
 
 .badge-angular-green {
   background: var(--green-bg);
-  color: var(--green);
+  color: var(--green-text);
 }
 
 .badge-angular-red {
   background: var(--red-bg);
-  color: var(--red);
+  color: var(--red-text);
 }
 
 .badge-angular-amber {
   background: var(--amber-bg);
-  color: var(--amber);
+  color: var(--amber-text);
 }
 
 /* Geometric card with thick ink outline and hard offset shadow */
@@ -791,7 +852,8 @@ select {
 
 /* ─── Focus visibility ─────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 3px solid var(--accent);
+  outline-style: solid;
+  outline-width: 3px;
   outline-color: var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius-xs);
@@ -1114,25 +1176,41 @@ select {
   border: 1px solid var(--border-dim);
 }
 
-/* ─── Stat cards ───────────────────────────────────────────────────────── */
+/* ─── Stat cards ──────────────────────────────────────────────────────────
+   Geometry and depth are deliberately identical to .ts-card — same ink border,
+   same radius, same hard offset shadow. These cards used to carry a 4px
+   full-width colour bar instead, which the 18px radius clipped into a detached
+   sliver that visibly seamed against the 2px ink border, leaving the stat row
+   reading as flat Material tiles inside an otherwise offset-shadowed console.
+   The accent is now an inset left rail, skewed like the T's parallelogram bar
+   (same motif as .badge-angular and .ts-divider), so status colour still reads
+   at a glance without fighting the border. */
 .ts-stat {
   position: relative;
   flex: 1 1 160px;
   min-width: 160px;
-  padding: 14px 16px;
+  /* Left padding is wider than the rest to clear the accent rail. */
+  padding: 14px 16px 14px 20px;
   border-radius: var(--radius-md);
   background: var(--bg-surface);
   border: var(--stroke) solid var(--border);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
   transition: transform var(--dur) var(--ease-out),
     box-shadow var(--dur) var(--ease-out);
 }
+/* Inset by the stroke on every open side so the rail sits inside the border
+   instead of butting against it, and clipped at an angle to match the
+   parallelogram geometry used elsewhere in the console. */
 .ts-stat::before {
   content: "";
   position: absolute;
-  inset: 0 0 auto 0;
-  height: 4px;
+  top: var(--stroke);
+  bottom: var(--stroke);
+  left: var(--stroke);
+  width: 4px;
   background: var(--accent);
+  clip-path: polygon(2px 0, 100% 0, calc(100% - 2px) 100%, 0 100%);
 }
 .ts-stat[data-accent="green"]::before { background: var(--green); }
 .ts-stat[data-accent="red"]::before   { background: var(--red); }
@@ -1262,11 +1340,11 @@ select {
   border-color: var(--border);
 }
 .ts-nav-link[data-active="true"] {
-  color: var(--text-primary);
+  color: var(--on-accent);
   font-weight: 700;
-  background: var(--accent);
+  background: var(--accent-grad);
   border-color: var(--border);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--accent-shadow);
 }
 .ts-nav-link::before {
   content: "";
@@ -1310,10 +1388,16 @@ select {
 .ts-segment:hover {
   color: var(--text-primary);
 }
-.ts-segment[aria-checked="true"] {
+/* Active segment. Matches BOTH ARIA patterns on purpose: the Relay filters are
+   `role="radiogroup"` (aria-checked) while the landing simulator is
+   `role="tablist"` (aria-selected). Keying on only one of them left the
+   website's active tab painted as inactive. */
+.ts-segment[aria-checked="true"],
+.ts-segment[aria-selected="true"] {
   color: var(--on-accent);
-  background: var(--accent);
+  background: var(--accent-grad);
   border-color: var(--border);
+  box-shadow: var(--accent-shadow);
 }
 
 /* ─── Utility ──────────────────────────────────────────────────────────── */
@@ -1338,13 +1422,16 @@ select {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   NEO-BRUTALIST WIREFRAME LAYER
-   Landing-page primitives: outlined pills, bracket frames, offset panels,
-   sticker chips and hard-shadow cards. Every rule is a *black outline +
-   offset shadow* construction — no blurs, no gradients on the surface.
-   ══════════════════════════════════════════════════════════════════════════ */
+   
+   PAPER WIREFRAME LAYER (landing page)
+   Outlined pills, bracket frames, offset panels, sticker chips and elevated
+   cards. This describes the *paper* construction: a visible outline, an offset
+   shadow, an opaque fill, no blur on the surface itself. Both themes build it
+   from tokens, so the geometry survives the switch while the treatment changes:
+   the stamped outline in light, the glass panel with a hairline edge and
+   ambient depth in dark.
+   */
 
-/* Thick outlined pill — the workhorse capsule of the landing page */
 .nb-pill {
   display: inline-flex;
   align-items: center;
@@ -1388,8 +1475,9 @@ button.nb-pill {
 
 /* Accent-filled pill */
 .nb-pill-accent {
-  background: var(--accent);
+  background: var(--accent-grad);
   color: var(--on-accent);
+  box-shadow: var(--accent-shadow);
 }
 .nb-pill-accent:hover {
   background: var(--accent-hover);
@@ -1688,8 +1776,14 @@ button.nb-pill {
    `.ts-focus-inset`, which keeps its inset border treatment (higher
    specificity), and still overridable by an explicit Tailwind
    `focus:outline-none`, since utilities outrank components. */
+/* Longhands, not the `outline` shorthand: with a `var()` inside it the
+   shorthand silently resolved `outline-color` back to `currentcolor`, which
+   handed keyboard users a grey ring on every pill/link that draws its own
+   outline. Setting style/width/color explicitly pins the brand accent. */
 :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-  outline: 3px solid var(--accent);
+  outline-style: solid;
+  outline-width: 3px;
+  outline-color: var(--accent);
   outline-offset: 2px;
 }
 

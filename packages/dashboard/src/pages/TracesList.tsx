@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { getTraces } from "../api/client";
 import type { Trace } from "../types";
 import { StatusBadge } from "../components/StatusBadge";
@@ -228,7 +228,7 @@ export function TracesList() {
       />
 
       {/* ── Featured capabilities ──────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div
           className="p-3.5 rounded-[10px] flex items-center justify-between gap-3 ts-stagger ts-card-interactive"
           style={{ ["--stagger-i" as string]: 1, background: "var(--bg-surface-2)", border: "1px solid var(--border)" }}
@@ -254,7 +254,7 @@ export function TracesList() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[13px] font-semibold text-[var(--text-primary)]">OpenAPI Documentation Generator</span>
-              <span className="ts-chip" style={{ color: "var(--amber)", background: "var(--amber-bg)", border: "1px solid var(--amber-border)" }}>
+              <span className="ts-chip" style={{ color: "var(--amber-text)", background: "var(--amber-bg)", border: "1px solid var(--amber-border)" }}>
                 Coming Soon
               </span>
             </div>
@@ -264,7 +264,7 @@ export function TracesList() {
           </div>
           <span className="text-[11px] shrink-0 font-medium px-2 py-1 rounded ts-chip-neutral">Upcoming</span>
         </div>
-      </div>
+      </div> */}
 
     
       {allTraces.length > 0 && (
