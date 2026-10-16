@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import { findGroupByCode } from "../dao/group.dao";
-import { addSummaryEntry, getSummaryEntries } from "../dao/group-summary.dao";
+import { findGroupByCode } from "../dao/group.dao.js";
+import { addSummaryEntry, getSummaryEntries } from "../dao/group-summary.dao.js";
 
 export async function addSummaryEntryController(req: Request, res: Response) {
   try {

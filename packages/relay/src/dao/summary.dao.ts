@@ -1,5 +1,5 @@
-import groupModel from "../models/group.model";
-import summaryModel from "../models/summary.model";
+import groupModel from "../models/group.model.js";
+import summaryModel from "../models/summary.model.js";
 
 export async function createSummary(
   instanceId: string,
