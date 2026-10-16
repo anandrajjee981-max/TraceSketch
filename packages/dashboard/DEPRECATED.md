@@ -1,1 +1,0 @@
-This package is no longer used for development. All active development happens in packages/tracesketch. Do not run `npm run dev` from here — it will run stale code. See packages/tracesketch/src/ for the current source.
