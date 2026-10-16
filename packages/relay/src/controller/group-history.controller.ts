@@ -75,7 +75,9 @@ export async function recordMarkerController(req: Request, res: Response) {
  * GET /group/:code/history?types=trace_share,replay_result
  *
  * Reads do not require an active session: the Group document is gone once the
- * 6h TTL fires, and reading expired history is the entire purpose here.
+ * 6h TTL fires. History itself carries the same 6h TTL, so this serves the
+ * live-window archive; older entries live only in each machine's collector
+ * SQLite, which the dashboard merges client-side.
  */
 export async function getHistoryController(req: Request, res: Response) {
   try {

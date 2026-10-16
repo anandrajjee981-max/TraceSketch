@@ -59,7 +59,8 @@ export async function recordHistory(
 
 /**
  * Entries for one group, oldest first, so a client can replay the timeline in
- * the order it happened. Survives group expiry, which is the whole point.
+ * the order it happened. Entries expire 6h after creation (TTL on createdAt);
+ * beyond that window clients fall back to their collector SQLite copy.
  *
  * `types` is an optional allowlist; omit it to get every entry type.
  */
@@ -101,12 +102,13 @@ type RawTotalRow = {
 };
 
 /**
- * Delete every archived entry for a group.
+ * Delete every archived entry for a group (manual clear before the 6h TTL).
  *
  * Authorisation: the caller must already be a recorded participant in that
  * group. This endpoint cannot fall back to the Group collection for membership
  * because the group has usually expired by the time anyone wants to delete its
- * history — and an expired group is precisely the case this endpoint serves.
+ * history — and an expired group is precisely one case this endpoint serves
+ * (within the 6h history window).
  *
  * That fallback matters for safety, not just tidiness. Group codes are four
  * characters and are shared out loud, and history reads are already
@@ -129,14 +131,16 @@ export async function deleteHistoryForGroup(
 }
 
 /**
- * Every group this instance has ever been part of, most recently active first.
+ * Every group this instance has been part of within the 6h relay window,
+ * most recently active first.
  *
  * Membership comes from the marker rows the dashboard writes on entry. Counts
  * span every participant in the group, not just this instance, so the summary
  * reflects the whole conversation.
  *
  * The Group collection is not consulted: it expires after 6h and would report
- * nothing for exactly the expired sessions this list exists to surface.
+ * nothing for expired sessions. For history older than 6h, clients read their
+ * collector SQLite copy instead of this endpoint.
  */
 export async function listGroupsForInstance(instanceId: string): Promise<GroupSummary[]> {
   // Pass 1 — membership and ordering, restricted to this instance.

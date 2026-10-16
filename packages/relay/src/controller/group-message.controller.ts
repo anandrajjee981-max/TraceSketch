@@ -36,11 +36,12 @@ export async function addMessageController(req: Request, res: Response) {
       io.to(groupCode).emit("group-message", result.message);
     }
 
-    // Durable shared history. Written here, server-side, rather than by the
-    // sender's browser: a browser write can only reach its own machine's
-    // collector, so the peer would never see it. Writing from the relay is what
-    // makes one entry visible to both sides — and it outlives the 6h TTL on
-    // GroupMessage, which is what History reads once the session is gone.
+    // Shared history with the same 6h TTL as GroupMessage. Written here,
+    // server-side, rather than by the sender's browser: a browser write can
+    // only reach its own machine's collector, so the peer would never see it.
+    // Writing from the relay is what makes one entry visible to both sides
+    // while the window lasts; the collector SQLite copy (relay-archiver +
+    // dashboard mirror) is the permanent record that outlives the TTL.
     //
     // Every persisted type is archived, notes included, so the History tab can
     // replay the whole conversation and not just the shared traces.

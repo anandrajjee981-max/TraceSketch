@@ -1,8 +1,6 @@
 # traceSketch
 
-Local-first API tracing, replay, regression testing, and real-time pair debugging for Node.js.
-
-Capture real requests, replay them anywhere, turn fixed bugs into permanent regression tests, and debug together with another developer in real time — all local-first by default.
+Save your API requests, send them again, and turn fixed bugs into tests. For Node.js and Express.
 
 ```bash
 npm install tracesketch
@@ -10,188 +8,260 @@ npm install tracesketch
 
 ---
 
-## The Problem
+## Video
 
-An API fails in production. You get a 500 error and nothing else. You don't know what the exact request was, where it failed, or how to reproduce it safely. So you guess — or you're stuck saying "it works on my machine" with no way to show the other developer what actually happened.
+[![traceSketch video](https://img.youtube.com/vi/YNaeYQ0bb8k/hqdefault.jpg)](https://www.youtube.com/watch?v=YNaeYQ0bb8k)
 
-## What traceSketch Does
-
-```
-Request comes in → automatically captured → you see exactly where time was spent
-        ↓
-Click Replay → the exact same request runs again, anywhere you choose
-        ↓
-Fix the bug → confirm with another replay → save it as a regression test
-        ↓
-That bug is now permanently guarded
-```
-
-Everything runs locally by default. No account, no cloud, no signup — except when you explicitly choose to debug together with another developer (see Relay below).
+A short video that shows how to install and use traceSketch.
 
 ---
 
-## Quick Start
+## What is traceSketch?
 
-### 1. Add the middleware to your app
+When your API gives an error, it is hard to know what happened. You need the exact request that caused it.
+
+traceSketch saves every request your app gets. Later, you can send the same request again, check if your fix works, and save it as a test.
+
+Everything runs on your own computer. Your data stays there unless you choose to share it.
+
+How it works:
+
+```text
+Request reaches your Express app
+        |
+        v
+traceSketch captures it
+        |
+        v
+The trace is saved on your computer
+        |
+        v
+You look at it in the dashboard
+        |
+        v
+You replay the request  <---------------+
+        |                                |
+        v                                |
+Does the fix work?                       |
+   |                                     |
+   |-- No: keep debugging ---------------+
+   |
+   '-- Yes
+        |
+        v
+Save it as a regression test
+        |
+        v
+Run it after future changes
+```
+
+## Who is it for?
+
+Developers who use Express with Node.js. Other frameworks are not supported yet.
+
+---
+
+## Quick start
+
+### Step 1: Add traceSketch to your app
 
 ```javascript
+// If you use ES modules (import):
 import express from 'express';
 import { traceSketch } from 'tracesketch';
 
+// If you use CommonJS (require), use these two lines instead:
+// const express = require('express');
+// const { traceSketch } = require('tracesketch');
+
 const app = express();
 
-app.use(express.json());   // must come first
-app.use(traceSketch());     // then this
+app.use(express.json());   // put this before traceSketch
+app.use(traceSketch());
 
 app.get('/api/hello', (req, res) => {
-  res.json({ message: "hello" });
+  res.json({ message: 'hello' });
 });
 
 app.listen(3000);
 ```
 
-Every request your app receives is now automatically captured. No extra code per route.
+If you use TypeScript, the `import` version works. The types are included.
 
-### 2. Start the collector and dashboard
+You do not need to change anything in your routes.
+
+### Step 2: Start traceSketch
+
+Open a new terminal and run:
 
 ```bash
 npx tracesketch start
 ```
 
-This starts:
-- The local storage server — `http://localhost:4000`
-- The dashboard — `http://localhost:8470`
+Keep this terminal open. It starts two things:
 
-> **Note:** Ports `4000` and `8470` are reserved by traceSketch. Please choose a different port for your own application.
+- The collector, which saves your traces: `http://localhost:4000`
+- The dashboard, which shows your traces: `http://localhost:8470`
 
-### 3. Use your app normally
+> **Note:** traceSketch uses ports `4000` and `8470`. Run your own app on a different port.
 
-Hit your routes however you normally would. Every request shows up in the dashboard automatically.
+### Step 3: Use your app
+
+Send requests to your app as usual. Then open `http://localhost:8470` to see them.
 
 ---
 
 ## Dashboard
 
-| Section | What it shows |
+| Page | What it shows |
 |---|---|
-| **Traces** | Every request — method, path, status code, duration |
-| **Trace Detail** | Full breakdown of one request, including headers and body |
-| **Replay** | Re-run any captured request against a target URL |
-| **Regression Tests** | Saved checks you can re-run anytime to confirm a bug hasn't returned |
-| **Relay** | Real-time pair debugging with another developer (see below) |
+| **Traces** | All requests, with method, path, status code, and time |
+| **Trace detail** | One request, with its headers, body, and query |
+| **Replays** | The replays you ran, and their results |
+| **Regressions** | Your saved tests |
+| **Relay** | Chat and share traces with another developer |
+| **CLI** | Send test requests from the dashboard |
 
-### Replaying a request
+### Replay a request
 
-1. Open any trace
-2. Click **Replay**
-3. Enter a target base URL (e.g. `http://localhost:3000`)
-4. Compare original vs replay — status code and duration, side by side
+1. Open a trace and click **Replay**.
+2. Enter the base URL to send it to. For example: `http://localhost:3000`.
+3. Compare the original result with the new result.
 
-### Saving a regression test
+```text
+Choose a saved trace
+        |
+        v
+Enter the target URL
+        |
+        v
+Replay the request  <--------------+
+        |                           |
+        v                           |
+Compare the results                 |
+        |                           |
+        v                           |
+Fix the issue if needed ------------+
+```
 
-1. Pick a trace you've fixed
-2. Click **Save as Regression Test**, set the expected status code
-3. Click **Run** anytime — instant PASS or FAIL
+### Save a regression test
+
+1. Open a trace of a bug you fixed.
+2. Click **Save as Regression Test**. Enter the status code you expect, usually `200`.
+3. Click **Run** any time. You will see PASS or FAIL.
 
 ---
 
-## Relay — Real-Time Pair Debugging
+## Relay: debug with another developer
 
-Sometimes "it works on my machine" needs a second pair of eyes. Relay lets two developers connect and debug together in real time, without setting up screen share or a call.
+Relay lets two developers work on the same problem at the same time.
 
-### How it works
+How to use it:
 
-1. One developer clicks **Create Group** in the Relay tab — gets a short 4-character code (e.g. `KLSP`)
-2. The other developer clicks **Join Group** and enters that code
-3. Both are now connected in a live session, limited to 2 developers per group
+1. Developer 1 opens the Relay page and clicks **Create Group**. They get a code with 4 letters, for example `KLSP`.
+2. Developer 2 clicks **Join Group** and enters the code.
+3. Now you are connected. A group can have 2 developers.
+
+### How Relay connects you
+
+```text
+ Developer 1            Relay server             Developer 2
+      |                       |                       |
+      |-- Create group ------>|                       |
+      |<-- Group code --------|                       |
+      |                       |<-- Join with code ----|
+      |<-- Connected ---------|-- Connected --------->|
+      |-- Share trace/msg --->|                       |
+      |                       |-- Deliver item ------>|
+```
 
 ### Message types
 
-The Relay chat supports four kinds of messages, each handled differently:
+There are four types of messages:
 
-| Type | Purpose | Persistence |
+| Type | Use | What happens to it |
 |---|---|---|
-| **Note** | A plain text message between developers | Saved to the relay session (expires with the session) |
-| **Trace Share** | Share a specific captured trace with the other developer | Saved to the relay session, and a reference is kept in your local history |
-| **Replay Result** | Share the outcome of a replay you just ran | Saved to the relay session, and a reference is kept in your local history |
-| **Crazy** | An ephemeral, off-the-record message — brainstorming, venting, anything you don't want recorded anywhere | **Never saved anywhere.** Delivered live over the socket connection only, and gone the instant it's sent. Not stored in the relay database, not stored locally. |
+| **Note** | A normal text message | Kept on the relay during the session, then deleted |
+| **Trace Share** | Send a trace to the other developer | Kept on the relay during the session. Also saved on your computer |
+| **Replay Result** | Send the result of a replay | Kept on the relay during the session. Also saved on your computer |
+| **Crazy** | A message that is not saved | Not saved anywhere. It is sent live and then it is gone |
 
-### What's stored where
+Where the data is stored:
 
-- **Relay session data** (group code, who's in it, Note/Trace Share/Replay Result messages) lives on a lightweight relay server for **6 hours**, then is automatically and permanently deleted.
-- **Crazy messages** are never written to any database, at any point — they exist only as a live broadcast to whoever is connected at that moment.
-- **Your local machine** keeps a permanent record of only the meaningful parts — which traces were shared and which replay results were shared during a session — in your own local database, which you can view or delete anytime. Casual chat (Notes, Crazy messages) never ends up here; only `trace_share` and `replay_result` entries are kept locally, so your history stays a useful debugging record instead of a chat log.
+- The relay keeps a session for 6 hours. Then it deletes everything.
+- Crazy messages are never saved. Not on the relay and not on your computer.
+- Your computer keeps Trace Share and Replay Result items in a local database. You can see them or delete them at any time. Notes are not saved on your computer.
 
-This keeps the core local-first promise intact: the only thing that ever leaves your machine is what you explicitly share, and even that disappears from the shared relay within hours. What's worth keeping permanently, you keep yourself, locally, under your own control.
+Relay needs the internet. The other features work on your computer. The relay server uses a free plan, so the first request after a long break can be slow.
 
 ---
 
-## The `sketch` CLI
+## The `sketch` command
 
-A command-line tool for quickly testing any endpoint, without Postman or curl.
+`sketch` sends a request to an endpoint from your terminal.
 
 ```bash
 sketch <method> <path> <port-or-url>
 ```
 
-**Local testing** — pass just the port:
+Examples:
+
 ```bash
+# A port number means localhost
 sketch post /api/payment 5000
-```
 
-**Remote testing** — pass the full URL:
-```bash
+# A full URL means another server
 sketch post /api/payment http://yourapp.com
-```
 
-**With a request body:**
-```bash
+# Send a JSON body
 sketch post /api/payment 5000 --body '{"amount":100}'
 ```
 
-`sketch` automatically uses your local instance credentials — no extra setup for authenticated calls to your own collector.
+If you call your own collector, `sketch` uses your local login details automatically.
+
+On Windows PowerShell, JSON in `--body` can break because of the quotes. Use the **CLI** page in the dashboard instead. It has a normal text box for the body.
 
 ---
 
-## What Gets Captured
+## What traceSketch saves
 
-- HTTP method, path, status code, duration
-- Request headers, body, and query parameters
-- Sensitive fields (passwords, tokens, `Authorization` headers, API keys) are automatically redacted before anything is saved — including nested fields
-
----
-## Privacy & Storage
-
-- Local-first by default — nothing leaves your machine unless you explicitly replay a trace against a remote URL, or explicitly share something via Relay
-- Local data is stored in SQLite at `~/.tracesketch/`
-- Traces expire automatically (24 hours by default) and are cleaned up
-- Relay sessions expire automatically after 6 hours; Crazy-type Relay messages are never stored at all, anywhere
+- The method, path, status code, and time of each request
+- The headers, body, and query of each request
+- Passwords, tokens, `Authorization` headers, and API keys are replaced with `REDACTED` before saving. This also works for values inside nested JSON.
 
 ---
+
+## Privacy
+
+- Your data stays on your computer by default.
+- Data leaves your computer only when you replay to a remote URL or share something in Relay.
+- Local data is saved in a SQLite file in `~/.tracesketch/`.
+- Traces are deleted after 24 hours by default.
+- Relay sessions are deleted after 6 hours. Crazy messages are never saved.
 
 ## Security
 
-`Replay` makes outbound HTTP requests to a target URL you provide, so it's protected against being misused as an open network proxy:
+Replay sends requests for you, so it has safety checks:
 
-- Only `http:` and `https:` protocols are allowed
-- The target hostname is resolved and the actual IP is validated — private and reserved network ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local addresses, and cloud metadata endpoints (`169.254.169.254`) are blocked by default, including when a domain name resolves to one of these (DNS rebinding protection)
-- `localhost` / `127.0.0.1` is allowed, since local-first replay against your own machine is the core use case
-- Redirects are not followed automatically — a redirect response is returned as-is rather than silently chased to a new destination
-- Every replay request has a strict timeout
+- Only `http` and `https` are allowed.
+- The real IP address of the target is checked. These are blocked: private ranges (`10.x.x.x`, `172.16.x.x` to `172.31.x.x`, `192.168.x.x`), link-local addresses, and cloud metadata addresses (`169.254.169.254`). This also applies when a domain name points to one of them.
+- `localhost` and `127.0.0.1` are allowed, because replaying to your own computer is the main use.
+- Redirects are not followed. You only see the redirect response.
+- Every replay has a time limit.
 
-If you find a security issue, please report it privately rather than opening a public issue.
+If you find a security problem, please report it privately. Do not open a public issue.
 
 ---
 
-## Updating
+## Update
 
-New versions are published regularly. To update to the latest version:
+To get the latest version:
 
 ```bash
 npm install -g tracesketch@latest
 ```
 
-If a new version doesn't seem to take effect, your npm cache may be holding an old copy:
+If you still see the old version, clear the npm cache and install again:
 
 ```bash
 npm uninstall -g tracesketch
@@ -199,9 +269,9 @@ npm cache clean --force
 npm install -g tracesketch@latest
 ```
 
-Open a new terminal window afterward — PATH changes don't apply to terminals that were already open.
+Open a new terminal after you update.
 
-To check what version you have versus the latest available:
+To check your version and the latest version:
 
 ```bash
 npm list -g tracesketch
@@ -212,7 +282,7 @@ npm view tracesketch version
 
 ## Status
 
-Early access. The core loop — capture, replay, regression testing — is tested end to end and works. Relay (pair debugging) is a newer addition and still evolving. The API surface may still change as the project grows. Feedback is genuinely welcome.
+traceSketch is in early access. Capture, replay, and regression tests work well. Relay is new and may change. If you find a bug or have an idea, please tell me.
 
 ## Author
 
@@ -220,7 +290,8 @@ Built by Anand Raj.
 
 - GitHub: [github.com/anandrajjee981-max](https://github.com/anandrajjee981-max)
 - LinkedIn: [linkedin.com/in/anand-raj-059011387](https://www.linkedin.com/in/anand-raj-059011387/)
-- Instagram :[instagram.com/anand_raj9435/](https://www.instagram.com/anand_raj9435/)
+- Instagram: [instagram.com/anand_raj9435](https://www.instagram.com/anand_raj9435/)
+
 ## License
 
 MIT

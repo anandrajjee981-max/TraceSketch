@@ -9,9 +9,9 @@ import { ThemeToggle } from "./ThemeToggle";
 /**
  * Top-right dropdown of every group this instance has previously joined.
  *
- * Backed by the relay's shared group_history, which has no TTL — so these
- * survive the relay's 6h session expiry, unlike the live relay feed, and both
- * peers see the same list.
+ * Merges the relay's shared 6h window with this machine's permanent collector
+ * SQLite copy, so entries survive the relay's 6h TTL expiry. Relay rows show
+ * both peers' activity while the window lasts; older rows come from SQLite.
  */
 function JoinedGroupsMenu() {
   const { instanceId } = useConfig();

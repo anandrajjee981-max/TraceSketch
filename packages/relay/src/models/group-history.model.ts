@@ -1,16 +1,20 @@
 import mongoose from "mongoose";
 
 /**
- * Durable, shared archive of relay activity.
+ * Shared archive of relay activity with a 6h TTL.
  *
- * Deliberately has NO `expires` field. The GroupMessage and Group collections
- * both carry `expires: 21600`, so MongoDB reaps them 6h after creation. This
- * collection is the only place a shared trace or replay result outlives the
- * session that produced it.
+ * GroupMessage, Group, GroupSummary and Summary collections all carry
+ * `expires: 21600`, so MongoDB reaps them 6h after creation. This collection
+ * follows the same rule: every entry (joined markers included) expires 6h
+ * after creation because the permanent record lives in each machine's
+ * collector SQLite (`group_history` table, fed by the relay-archiver socket
+ * and the dashboard mirror). The relay is the live/shared window; SQLite is
+ * the durable archive.
  *
  * The relay is the only writer. That matters: a browser-side write to the
  * collector's local SQLite lands on whichever machine sent it, so peers never
- * see each other's shares. Writing here means one entry for everyone.
+ * see each other's shares. Writing here means one entry for everyone (while
+ * the 6h window lasts).
  */
 const groupHistorySchema = new mongoose.Schema(
   {
@@ -29,10 +33,11 @@ const groupHistorySchema = new mongoose.Schema(
     // trace_id is set.
     traceId: { type: String, default: null },
     data: { type: String, default: null },
-    // NO `expires` here. Adding it makes Mongoose create a TTL index on
-    // createdAt, and MongoDB's TTL monitor then silently deletes the whole
-    // archive 6h in — which defeats the entire purpose of this collection.
-    createdAt: { type: Date, default: Date.now },
+    // 6h TTL, matching Group / GroupMessage. MongoDB's TTL monitor deletes
+    // entries ~6h after createdAt; the collector SQLite copy is what outlives
+    // the session. All entry types expire — see LOCAL_ENTRY_TYPES on the
+    // collector for what is retained locally (trace_share/replay_result).
+    createdAt: { type: Date, default: Date.now, expires: 21600 },
   },
   { collection: "group_history", versionKey: false },
 );

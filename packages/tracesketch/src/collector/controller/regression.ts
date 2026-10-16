@@ -2,6 +2,7 @@ import { Request,Response } from "express";
 import { getTrace } from "../dao/trace.dao";
 import { getRegressionsByTraceId, insertregression, getRegressionById, getAllRegressions } from "../dao/regression.dao";
 import { stripUnsafeHeaders } from "../utils/headers";
+import { safeReplayFetch } from "../security/safe-replay-fetch";
 
 
 export async function postregression(req: Request, res: Response) {
@@ -156,30 +157,26 @@ try {
     const hasBody = method !== 'GET' && method !== 'HEAD' && parsedBody != null && !(typeof parsedBody === 'object' && Object.keys(parsedBody).length === 0);
     const body = hasBody ? JSON.stringify(parsedBody) : undefined;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 7000);
-    let fetchResponse: globalThis.Response;
-    try {
-      fetchResponse = await fetch(fullUrl, {
-        method: method,
-        headers,
-        body,
-        signal: controller.signal,
-      } as RequestInit);
-    } catch (fetchErr) {
-      clearTimeout(timeout);
-      const cause = (fetchErr as Error & { cause?: { code?: string } })?.cause;
-      if ((fetchErr as Error).name === "AbortError") {
-        return res.status(408).json({ message: `Request to ${fullUrl} timed out after 7s. Is the target server running?`, expected_status, actual_status: 408 });
+    const result = await safeReplayFetch({ url: fullUrl, method, headers, body });
+
+    if (!result.ok) {
+      switch (result.reason) {
+        case "invalid_url":
+          return res.status(400).json({ message: "Invalid target URL", expected_status, actual_status: 400 });
+        case "private_target":
+          return res.status(400).json({ message: "Target is private/internal", expected_status, actual_status: 400 });
+        case "bad_port":
+          return res.status(400).json({ message: "Invalid target URL port. Use a valid HTTP port; the test app uses http://localhost:6001.", expected_status, actual_status: 400 });
+        case "connection_refused":
+          return res.status(502).json({ message: `Could not connect to ${target_base_url}. Make sure the target server is running (test app default is http://localhost:6001).`, expected_status, actual_status: 502 });
+        case "timeout":
+          return res.status(408).json({ message: `Request to ${fullUrl} timed out after 7s. Is the target server running?`, expected_status, actual_status: 408 });
+        default:
+          throw result.error;
       }
-      if (cause?.code === "ECONNREFUSED") {
-        return res.status(502).json({ message: `Could not connect to ${target_base_url}. Make sure the target server is running (test app default is http://localhost:6001).`, expected_status, actual_status: 502 });
-      }
-      throw fetchErr;
-    } finally {
-      clearTimeout(timeout);
     }
-    const actual_status = fetchResponse!.status;
+
+    const actual_status = result.response.status;
     const passed = actual_status === expected_status;
     // Always 200 with passed flag; keep message for backwards compat. Old dashboard treats 404+body as valid too.
     return res.status(200).json({
@@ -188,19 +185,13 @@ try {
       actual_status,
       passed,
     });
-
-  }
-  catch(err){
+  } catch (err) {
     console.error("[ReplayRegression]", err);
     res.status(500).json({
-      message:"internal server error"
-    })
+      message: "internal server error"
+    });
   }
 }
-
-
-
-
 
 export async function listAllRegressions(req: Request, res: Response) {
   try {

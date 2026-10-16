@@ -10,8 +10,14 @@ import groupRouter from "./routes/group.routes";
 import cron from 'node-cron';
 import { cleanExpiredTraces } from "./dao/trace.dao";
 import { resumeActiveMemberships } from "./relay-archiver";
+import { dashboardSession, setDashboardInstance } from "./controller/dashboard.controller";
 
 const app = express();
+
+// Registered BEFORE the global cors() below on purpose: this route must own its
+// CORS entirely and never inherit the app-wide (permissive) middleware, which
+// would add its own Access-Control-Allow-Origin header.
+app.get("/dashboard-session", dashboardSession);
 
 // ---- CORS: allow Vite dashboard (5173) + common local ports + any localhost ----
 app.use(
@@ -33,7 +39,7 @@ app.use(
 );
 app.use(express.json());
 
-let cachedInstance: { instance_id: string } | null = null;
+let cachedInstance: { instance_id: string; secret: string } | null = null;
 
 app.get("/health", (_req, res) => {
   if (cachedInstance) {
@@ -61,6 +67,7 @@ export function startCollector() {
   initSchema();
   const instance = getOrCreateInstance();
   cachedInstance = instance;
+  setDashboardInstance(instance);
   console.log(`traceSketch instance ready: ${instance.instance_id}`);
 
   // Re-open relay sockets for groups this machine is still a member of. Without

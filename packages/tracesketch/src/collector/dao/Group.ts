@@ -21,6 +21,20 @@ export function isLocalEntryType(value: unknown): value is LocalEntryType {
   return value === "trace_share" || value === "replay_result";
 }
 
+/**
+ * The only marker types allowed through insertHistory().
+ *
+ * The dashboard records its own presence with a "joined" marker when it enters
+ * a group. This is a separate allowlist from LOCAL_ENTRY_TYPES: markers are not
+ * conversation content, so "note" and "crazy" must still be rejected here.
+ */
+export const LOCAL_MARKER_TYPES = ["joined"] as const;
+export type LocalMarkerType = (typeof LOCAL_MARKER_TYPES)[number];
+
+export function isLocalMarkerType(value: unknown): value is LocalMarkerType {
+  return value === "joined";
+}
+
 // Insert initial history record
 //
 // Idempotent by design. The dashboard posts a marker whenever the Relay page
@@ -32,6 +46,12 @@ export async function insertHistory(
   instance_id: string,
   entry_type: string
 ) {
+  if (!isLocalMarkerType(entry_type)) {
+    throw new Error(
+      `entry_type must be one of: ${LOCAL_MARKER_TYPES.join(", ")}`
+    );
+  }
+
   const existing = db
     .prepare(
       `

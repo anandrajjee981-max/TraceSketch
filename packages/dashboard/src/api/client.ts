@@ -16,14 +16,41 @@ export function getRelayBase(): string {
   return RELAY_BASE_URL.replace(/\/$/, "");
 }
 
-function getInstanceId(): string {
-  const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
-  return env?.VITE_INSTANCE_ID ?? "inst_placeholder_12345";
+// ---- Runtime dashboard session ----
+//
+// The instance id + secret are NOT built into the bundle. The collector hands
+// them to the locally-served dashboard through GET /dashboard-session; we keep
+// them in memory only (never localStorage, never a build-time env var). The
+// promise is memoized so every call site shares one request.
+let session: { instanceId: string; secret: string } | null = null;
+let sessionPromise: Promise<{ instanceId: string; secret: string }> | null = null;
+
+export async function loadDashboardSession(): Promise<{ instanceId: string; secret: string }> {
+  if (session) return session;
+  if (!sessionPromise) {
+    sessionPromise = (async () => {
+      const res = await fetch(apiUrl("/dashboard-session"));
+      if (!res.ok) throw new Error(`dashboard-session HTTP ${res.status}`);
+      const data = (await res.json()) as { instanceId?: unknown; secret?: unknown };
+      if (typeof data.instanceId !== "string" || typeof data.secret !== "string") {
+        throw new Error("dashboard-session: malformed response");
+      }
+      session = { instanceId: data.instanceId, secret: data.secret };
+      return session;
+    })().catch((err) => {
+      sessionPromise = null;
+      throw err;
+    });
+  }
+  return sessionPromise;
 }
 
-function getInstanceSecret(): string {
-  const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
-  return env?.VITE_INSTANCE_SECRET ?? "secret_placeholder_12345";
+export function getInstanceId(): string {
+  return session?.instanceId ?? "";
+}
+
+export function getInstanceSecret(): string {
+  return session?.secret ?? "";
 }
 
 function apiUrl(path: string, baseOverride?: string): string {
@@ -42,6 +69,7 @@ function headers(instanceId?: string, instanceSecret?: string): HeadersInit {
 }
 
 async function fetchJson<T>(url: string, instanceId?: string): Promise<T> {
+  await loadDashboardSession().catch(() => {});
   const res = await fetch(url, { headers: headers(instanceId) });
   if (!res.ok) {
     const text = await res.text();
@@ -70,6 +98,7 @@ export async function replayTrace(
   opts?: { instanceId?: string; instanceSecret?: string; apiBaseUrl?: string }
 ): Promise<ReplayResult> {
   const effectiveBase = opts?.apiBaseUrl !== undefined ? opts.apiBaseUrl : getApiBase();
+  await loadDashboardSession().catch(() => {});
   const url = apiUrl(`/traces/${encodeURIComponent(traceId)}/replay`, effectiveBase);
   const res = await fetch(url, {
     method: "POST",
@@ -116,6 +145,7 @@ export async function createRegression(
   opts?: { instanceId?: string; instanceSecret?: string; apiBaseUrl?: string }
 ): Promise<{ message: string; regression?: unknown }> {
   const effectiveBase = opts?.apiBaseUrl !== undefined ? opts.apiBaseUrl : getApiBase();
+  await loadDashboardSession().catch(() => {});
   const url = apiUrl(`/traces/${encodeURIComponent(traceId)}/regression`, effectiveBase);
   const res = await fetch(url, {
     method: "POST",
@@ -141,6 +171,7 @@ export async function getRegressions(
   opts?: { instanceId?: string; instanceSecret?: string; apiBaseUrl?: string }
 ): Promise<RegressionsResponse> {
   const effectiveBase = opts?.apiBaseUrl !== undefined ? opts.apiBaseUrl : getApiBase();
+  await loadDashboardSession().catch(() => {});
   const url = apiUrl(`/traces/${encodeURIComponent(traceId)}/regression`, effectiveBase);
   const res = await fetch(url, {
     headers: headers(opts?.instanceId, opts?.instanceSecret),
@@ -166,6 +197,8 @@ export async function runRegression(
   opts?: { instanceId?: string; instanceSecret?: string; apiBaseUrl?: string }
 ): Promise<RegressionRunResult> {
   const effectiveBase = opts?.apiBaseUrl !== undefined ? opts.apiBaseUrl : getApiBase();
+  await loadDashboardSession().catch(() => {});
+  await loadDashboardSession().catch(() => {});
   const url = apiUrl(`/traces/${encodeURIComponent(traceId)}/regression/${encodeURIComponent(String(regressionId))}/run`, effectiveBase);
   const res = await fetch(url, {
     method: "POST",
@@ -203,15 +236,17 @@ export async function fetchInstanceId(apiBaseUrl?: string): Promise<string> {
 
 // ---- Group History ----
 //
-// Source of truth is the RELAY's shared `group_history` collection, not the
-// collector. The collector's copy is per-machine SQLite: a share written by a
-// peer's browser lands on that peer's disk and is invisible to everyone else.
-// The relay is a single shared store both peers write to and read from.
+// Relay Mongo holds the shared 6h window (`expires: 21600` on group,
+// group-message, group-summary, summary AND group-history). The permanent
+// record is each machine's collector SQLite `group_history` (trace_share /
+// replay_result + joined markers), fed by the relay-archiver socket and the
+// dashboard mirror. UI reads merge both: relay for the live/shared window
+// (notes included), SQLite for anything older than the relay TTL.
 
 /**
  * A single persisted history row. Field names are snake_case because that is
- * the wire shape the relay emits (kept identical to the collector's columns so
- * the two stores stay interchangeable).
+ * the wire shape both stores emit (relay Mongo and collector SQLite share it
+ * so the two stay interchangeable).
  */
 export interface GroupHistoryRow {
   id: string | number;
@@ -266,23 +301,103 @@ export interface GroupListResponse {
 }
 
 /**
- * Every group this instance has joined, most recently active first.
+ * Every group this instance has joined: 6h relay window merged with the local
+ * permanent copy, most recently active first.
  *
- * Unlike the live feed (which the relay expires after 6h), this history has no
- * TTL, so previously joined sessions stay reachable from the navbar archive.
+ * The relay side expires 6h after creation; the collector side (SQLite) is the
+ * permanent record. Merging keeps previously joined sessions reachable from
+ * the navbar archive after the relay TTL fires.
  */
 export async function listMyGroups(opts?: {
   instanceId?: string;
   relayBaseUrl?: string;
+  apiBaseUrl?: string;
 }): Promise<GroupListResponse> {
   const base = opts?.relayBaseUrl ?? getRelayBase();
   const id = opts?.instanceId ?? getInstanceId();
-  const res = await fetch(`${base}/history/groups?instance_id=${encodeURIComponent(id)}`);
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
+
+  const [relayGroups, localGroups] = await Promise.all([
+    fetch(`${base}/history/groups?instance_id=${encodeURIComponent(id)}`)
+      .then(async (res) => {
+        if (!res.ok) return [] as GroupSummary[];
+        const data = (await res.json()) as GroupListResponse;
+        return data.groups ?? [];
+      })
+      .catch(() => [] as GroupSummary[]),
+    fetchJson<GroupListResponse>(apiUrl(`/groups?instance_id=${encodeURIComponent(id)}`, opts?.apiBaseUrl), id)
+      .then((data) => data.groups ?? [])
+      .catch(() => [] as GroupSummary[]),
+  ]);
+
+  const merged = new Map<string, GroupSummary>();
+  for (const g of [...relayGroups, ...localGroups]) {
+    const prev = merged.get(g.group_code);
+    if (!prev) {
+      merged.set(g.group_code, { ...g });
+      continue;
+    }
+    merged.set(g.group_code, {
+      group_code: g.group_code,
+      last_activity: Math.max(prev.last_activity, g.last_activity),
+      my_entries: Math.max(prev.my_entries, g.my_entries),
+      share_entries: Math.max(prev.share_entries, g.share_entries),
+      total_entries: Math.max(prev.total_entries, g.total_entries),
+    });
   }
-  return res.json() as Promise<GroupListResponse>;
+
+  const groups = [...merged.values()].sort((a, b) => b.last_activity - a.last_activity);
+  return { instance_id: id, count: groups.length, groups };
+}
+
+/** Read this machine's permanent SQLite copy of one group's history. */
+export async function getLocalGroupHistory(
+  groupCode: string,
+  opts?: { types?: string[]; instanceId?: string; apiBaseUrl?: string }
+): Promise<GroupHistoryResponse> {
+  await loadDashboardSession().catch(() => {});
+  const q = opts?.types?.length ? `?types=${encodeURIComponent(opts.types.join(","))}` : "";
+  const url = apiUrl(`/groups/history/${encodeURIComponent(groupCode)}${q}`, opts?.apiBaseUrl);
+  try {
+    const data = await fetchJson<GroupHistoryResponse>(url, opts?.instanceId);
+    return { group_code: groupCode, count: data.entries?.length ?? 0, entries: data.entries ?? [] };
+  } catch {
+    return { group_code: groupCode, count: 0, entries: [] };
+  }
+}
+
+/**
+ * Merged history for one group: relay 6h window + local permanent copy.
+ *
+ * Relay rows carry Mongo string ids, collector rows carry SQLite numeric ids,
+ * so dedup keys on instance|type|payload (same rule as the Relay page's
+ * mergeHistory) instead of the id. Sorted oldest-first like both sources.
+ */
+export async function getMergedGroupHistory(
+  groupCode: string,
+  opts?: { types?: string[]; relayBaseUrl?: string; instanceId?: string; apiBaseUrl?: string }
+): Promise<GroupHistoryResponse> {
+  const [relay, local] = await Promise.all([
+    getGroupHistory(groupCode, { types: opts?.types, relayBaseUrl: opts?.relayBaseUrl }).catch(
+      (): GroupHistoryResponse => ({ group_code: groupCode, count: 0, entries: [] })
+    ),
+    getLocalGroupHistory(groupCode, {
+      types: opts?.types,
+      instanceId: opts?.instanceId,
+      apiBaseUrl: opts?.apiBaseUrl,
+    }),
+  ]);
+
+  const seen = new Set<string>();
+  const merged: GroupHistoryRow[] = [];
+  for (const e of [...relay.entries, ...local.entries]) {
+    if (opts?.types?.length && !opts.types.includes(e.entry_type)) continue;
+    const key = `${e.instance_id}|${e.entry_type}|${e.data ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(e);
+  }
+  merged.sort((a, b) => a.saved_at - b.saved_at);
+  return { group_code: groupCode, count: merged.length, entries: merged };
 }
 
 // ---- Collector mirror (best effort) ----
@@ -295,16 +410,17 @@ export async function listMyGroups(opts?: {
  * Delete an archived group's history from both the relay and this machine's
  * local copy.
  *
- * Both are cleared on purpose. The navbar list and the archive view both read
- * from the relay, so deleting only the local copy would leave the entry in the
- * list and still render from the relay — the button would look broken. The
- * local copy is dropped best-effort: the relay is the copy that is actually
- * visible, so a collector hiccup must not fail the whole action.
+ * Both are cleared on purpose. The navbar list and the archive view merge
+ * relay + local, so deleting only one copy would leave the entry visible from
+ * the other — the button would look broken. The local copy is dropped
+ * best-effort: the relay is the shared copy, so a collector hiccup must not
+ * fail the whole action.
  */
 export async function deleteGroupHistory(
   groupCode: string,
   opts: { instanceId?: string; apiBaseUrl?: string; relayBaseUrl?: string }
 ): Promise<{ ok: boolean; deleted: number; message?: string }> {
+  await loadDashboardSession().catch(() => {});
   const instanceId = opts.instanceId ?? getInstanceId();
   const base = opts.relayBaseUrl ?? getRelayBase();
 
@@ -348,6 +464,7 @@ export async function setGroupMembership(
   active: boolean,
   opts?: { instanceId?: string; apiBaseUrl?: string }
 ): Promise<void> {
+  await loadDashboardSession().catch(() => {});
   try {
     const url = apiUrl("/groups/membership", opts?.apiBaseUrl);
     const res = await fetch(url, {
@@ -385,6 +502,7 @@ export async function recordGroupHistory(
   },
   opts?: { instanceId?: string; apiBaseUrl?: string }
 ): Promise<void> {
+  await loadDashboardSession().catch(() => {});
   try {
     const url = apiUrl("/groups/data", opts?.apiBaseUrl);
     const res = await fetch(url, {
@@ -405,9 +523,10 @@ export async function recordGroupHistory(
 /**
  * Record that this instance entered a group.
  *
- * The relay is the real target: its shared history collection is what
- * listMyGroups() reads, so skipping this leaves the navbar archive permanently
- * empty. The collector gets a best-effort copy for local inspection.
+ * Both stores get the marker: the relay for the shared 6h window both peers
+ * read, and the collector SQLite for the permanent local record that outlives
+ * the relay TTL. Skipping the relay leaves the navbar archive empty while the
+ * session is live; skipping the collector loses the entry after 6h.
  *
  * Never throws — neither call may break the relay page. Failures are logged
  * rather than swallowed, because an unchecked fetch here previously discarded
@@ -420,6 +539,8 @@ export async function markGroupJoined(
   const instanceId = opts?.instanceId ?? getInstanceId();
 
   // Relay first — this is the copy that matters.
+  await loadDashboardSession().catch(() => {});
+
   try {
     const base = opts?.relayBaseUrl ?? getRelayBase();
     const res = await fetch(`${base}/group/${encodeURIComponent(groupCode)}/history`, {
@@ -524,6 +645,7 @@ export async function recordConsoleTrace(
   },
   opts?: { instanceId?: string; apiBaseUrl?: string }
 ): Promise<{ ok: true; traceId?: string } | { ok: false; message: string }> {
+  await loadDashboardSession().catch(() => {});
   const { pathOnly, queryParams } = splitPathAndQuery(payload.routePath, payload.fullUrl);
 
   // Mirrors the CLI: a body is parsed into JSON when it can be, kept as a raw
@@ -568,3 +690,7 @@ export async function recordConsoleTrace(
     return { ok: false, message: `could not reach collector — is \`npx tracesketch start\` running? ${err instanceof Error ? err.message : String(err)}` };
   }
 }
+
+// Kick the session request off as soon as the module loads, so the credentials
+// are ready before the first user action. In-memory only; a page reload refetches.
+void loadDashboardSession().catch(() => {});

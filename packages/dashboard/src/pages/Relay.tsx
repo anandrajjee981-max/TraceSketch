@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useConfig } from "../context/ConfigContext";
 import {
   getRelayBase,
-  getGroupHistory,
+  getMergedGroupHistory,
   recordGroupHistory,
   markGroupJoined,
   setGroupMembership,
@@ -300,9 +300,13 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
     [RELAY_BASE, scrollFeed]
   );
 
-  // ── Fetch archived group history from the relay ──
+  // ── Fetch archived group history: relay 6h window + local SQLite ──
   // Independent of the live feed: a failure here sets historyError only and
   // must never take down the live relay view.
+  //
+  // Relay Mongo expires entries 6h after creation; the collector SQLite copy
+  // is the permanent record, so the two are merged (relay for notes + the
+  // shared window, SQLite for anything older than the TTL).
   //
   // `manageLoading: false` is used by callers that already raised the loading
   // flag during render, so no state is written synchronously from an effect.
@@ -315,9 +319,9 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
         setHistoryError(null);
       }
       try {
-        const data = await getGroupHistory(code, { types: HISTORY_TYPES });
+        const data = await getMergedGroupHistory(code, { types: HISTORY_TYPES, instanceId });
         const rows = (data.entries ?? []).map(rowToHistoryEntry).filter((e): e is HistoryEntry => e !== null);
-        // Oldest first, matching the relay's sort order.
+        // Oldest first, matching both sources' sort order.
         setHistory((prev) => mergeHistory(prev, rows));
       } catch (e) {
         setHistoryError(e instanceof Error ? e.message : "Failed to load group history");
@@ -325,7 +329,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
         setHistoryLoading(false);
       }
     },
-    []
+    [instanceId]
   );
 
   // ── Abandon a group that the relay no longer recognises ──

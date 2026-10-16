@@ -38,6 +38,10 @@ export function initSchema() {
       request_body TEXT,
       query_params TEXT,
       request_headers TEXT,  
+      response_body TEXT,
+      response_headers TEXT,
+      response_truncated INTEGER,
+      response_size INTEGER,
       expires_at INTEGER
     );
 
@@ -109,6 +113,27 @@ CREATE TABLE IF NOT EXISTS group_membership (
 );
 
   `);
+
+  // Migrations for databases created before the response columns existed.
+  // CREATE TABLE IF NOT EXISTS above is a no-op on an existing traces table,
+  // so the columns have to be added explicitly or older installs never get them.
+  const traceColumns = db
+    .pragma('table_info(traces)')
+    .map((column: { name: string }) => column.name);
+
+  const requiredTraceResponseColumns: Array<[string, string]> = [
+    ['response_body', 'TEXT'],
+    ['response_headers', 'TEXT'],
+    ['response_truncated', 'INTEGER'],
+    ['response_size', 'INTEGER'],
+  ];
+
+  for (const [columnName, columnType] of requiredTraceResponseColumns) {
+    if (!traceColumns.includes(columnName)) {
+      db.exec(`ALTER TABLE traces ADD COLUMN ${columnName} ${columnType}`);
+      console.log(`Migrated traces: added ${columnName} column`);
+    }
+  }
 
   // Migrations for databases created before source_id / group_membership existed.
   // CREATE TABLE IF NOT EXISTS above is a no-op on an existing table, so new

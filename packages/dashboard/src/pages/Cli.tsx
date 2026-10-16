@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { StatusBadge } from "../components/StatusBadge";
 import { Badge, PageHeader } from "../components/ui";
-import { recordConsoleTrace } from "../api/client";
+import { recordConsoleTrace, getInstanceSecret } from "../api/client";
 import { useConfig } from "../context/ConfigContext";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -149,9 +149,7 @@ export function Cli() {
   const seq = useRef(0);
 
   /** Instance secret from the same env source every other feature reads. */
-  const instanceSecret =
-    (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_INSTANCE_SECRET ??
-    "secret_placeholder_12345";
+  const instanceSecret = getInstanceSecret();
 
   // Live preview of what the CLI would print on its `→` line. Uses the same
   // resolver, so what you see here is exactly what gets called.

@@ -7,6 +7,8 @@ import {
   dropData,
   isLocalEntryType,
   LOCAL_ENTRY_TYPES,
+  isLocalMarkerType,
+  LOCAL_MARKER_TYPES,
   setMembershipActive,
 } from "../dao/Group";
 import { startObservingGroup, stopObservingGroup } from "../relay-archiver";
@@ -32,6 +34,14 @@ export async function insertHistoryController(req: Request, res: Response) {
 
     if (!group_code || !instance_id || !entry_type) {
       return res.status(400).json({ error: "Missing required fields: group_code, instance_id, entry_type" });
+    }
+
+    // Markers are not conversation content: only "joined" may be recorded here.
+    // "note"/"crazy" (and anything else) are rejected before they reach the DAO.
+    if (!isLocalMarkerType(entry_type)) {
+      return res.status(400).json({
+        error: `entry_type must be one of: ${LOCAL_MARKER_TYPES.join(", ")}`,
+      });
     }
 
     const result = await insertHistory(group_code, instance_id, entry_type);

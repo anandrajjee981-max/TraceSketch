@@ -3,12 +3,13 @@ const grouprouter = express.Router()
 import { createGroupController, joinGroupController, leaveGroupController, getSessionController } from '../controller/group.controller.js'
 import { addMessageController, getMessagesController } from '../controller/group-message.controller.js'
 import { recordMarkerController, getHistoryController, listJoinedGroupsController, deleteHistoryController } from '../controller/group-history.controller.js'
+import {creategroupLimiter, messageRateLimiter, joinGroupLimiter} from '../middleware/ratelimit.js'
 
 grouprouter.get('/session/:instanceId', getSessionController)
-grouprouter.post('/create',createGroupController)
-grouprouter.post('/join',joinGroupController)
+grouprouter.post('/create', creategroupLimiter, createGroupController)
+grouprouter.post('/join', joinGroupLimiter, joinGroupController)
 grouprouter.post('/group/:code/leave', leaveGroupController)
-grouprouter.post('/group/:code/messages', addMessageController)
+grouprouter.post('/group/:code/messages', messageRateLimiter, addMessageController)
 grouprouter.get('/group/:code/messages', getMessagesController)
 
 // Durable history. Shares are recorded automatically by addMessageController;

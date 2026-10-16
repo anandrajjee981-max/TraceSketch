@@ -1,7 +1,8 @@
 {
   "name": "tracesketch",
-  "version": "0.0.8",
+  "version": "0.0.11",
   "description": "Local-first API tracing, replay, and regression testing",
+  "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -10,7 +11,9 @@
   },
   "files": [
     "dist",
-    "dashboard-dist"
+    "dashboard-dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "dev": "tsx watch src/dev.ts",

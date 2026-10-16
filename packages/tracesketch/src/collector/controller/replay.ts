@@ -2,12 +2,11 @@ import { getTrace } from "../dao/trace.dao";
 import { getAllReplays, getReplaysByTraceId, insertReplayRun } from "../dao/replay.dao";
 import { Request, Response } from "express";
 import { stripUnsafeHeaders } from "../utils/headers";
-import { validateUrl } from "../security/url-validator";
-import { resolveAndValidate } from "../security/ip-validator";
+import { safeReplayFetch } from "../security/safe-replay-fetch";
 
 export async function replayTrace(req: Request, res: Response) {
   const targetBaseUrl = typeof req.body?.target_base_url === "string"
-    ? req.body.target_base_url.trim()
+    ? req.body.target_base_url
     : "";
 
   try {
@@ -16,10 +15,6 @@ export async function replayTrace(req: Request, res: Response) {
       : req.params.traceId;
     if (!targetBaseUrl) {
       return res.status(400).json({ message: "target_base_url is required" });
-    }
-    const isValid = await validateUrl(targetBaseUrl);
-    if (!isValid) {
-      return res.status(400).json({ message: "Invalid target URL" });
     }
 
     const trace = getTrace(traceId);
@@ -46,57 +41,41 @@ export async function replayTrace(req: Request, res: Response) {
 
     // build full URL with query params if present
     let fullUrl = targetBaseUrl.replace(/\/$/, "") + path;
-    const url = new URL(fullUrl);
-    const isresolved = await resolveAndValidate(url.hostname);
-    if (!isresolved) {
-      return res.status(400).json({ message: "Target is private/internal" });
-    }
 
     if (query_params) {
       try {
         const qp = JSON.parse(query_params);
         if (qp && typeof qp === "object" && Object.keys(qp).length > 0) {
-          const qs = new URLSearchParams(qp as Record<string,string>).toString();
+          const qs = new URLSearchParams(qp as Record<string, string>).toString();
           fullUrl += (fullUrl.includes("?") ? "&" : "?") + qs;
         }
       } catch {}
-    }
-    try {
-      const parsedUrl = new URL(fullUrl);
-      if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-        return res.status(400).json({ message: "target_base_url must use http or https" });
-      }
-    } catch {
-      return res.status(400).json({ message: `Invalid target URL: ${fullUrl}` });
     }
 
     const hasBody = method !== 'GET' && method !== 'HEAD' && parsedBody != null && !(typeof parsedBody === 'object' && Object.keys(parsedBody).length === 0);
     const body = hasBody ? JSON.stringify(parsedBody) : undefined;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 7000);
-    const startTime = Date.now();
+    const result = await safeReplayFetch({ url: fullUrl, method, headers, body });
 
-    let response: globalThis.Response;
-    try {
-      response = await fetch(fullUrl, {
-        method: method,
-        headers,
-        body,
-        signal: controller.signal,
-      } as RequestInit);
-    } catch (fetchErr) {
-      clearTimeout(timeout);
-      if ((fetchErr as Error).name === "AbortError") {
-        try { insertReplayRun(trace_id, targetBaseUrl, 408, Date.now() - startTime, "timeout", Date.now()); } catch {}
-        return res.status(408).json({ message: `Request to ${fullUrl} timed out after 7s. Is the target server running?` });
+    if (!result.ok) {
+      switch (result.reason) {
+        case "invalid_url":
+          return res.status(400).json({ message: "Invalid target URL" });
+        case "private_target":
+          return res.status(400).json({ message: "Target is private/internal" });
+        case "bad_port":
+          return res.status(400).json({ message: "Invalid target URL port. Use a valid HTTP port; the test app uses http://localhost:6001." });
+        case "connection_refused":
+          return res.status(502).json({ message: `Could not connect to ${targetBaseUrl}. Make sure the target server is running (test app default is http://localhost:6001).` });
+        case "timeout":
+          try { insertReplayRun(trace_id, targetBaseUrl, 408, 0, "timeout", Date.now()); } catch {}
+          return res.status(408).json({ message: `Request to ${fullUrl} timed out after 7s. Is the target server running?` });
+        default:
+          throw result.error;
       }
-      throw fetchErr;
-    } finally {
-      clearTimeout(timeout);
     }
 
-    const durationMs = Date.now() - startTime;
+    const { response, durationMs } = result;
     const responseStatus = response.status;
 
     const saved = insertReplayRun(
@@ -172,5 +151,4 @@ export async function listAllReplays(req: Request, res: Response) {
     res.status(500).json({ message: "internal server error" });
   }
 }
-
 

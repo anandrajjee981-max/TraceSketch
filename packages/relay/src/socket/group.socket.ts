@@ -1,6 +1,7 @@
 import type { Server, Socket } from "socket.io";
 import { getGroupSession, type GroupSession } from "../dao/group.dao.js";
 import { addMessage } from "../dao/group-message.dao.js";
+import { recordHistory, type HistoryEntryType } from "../dao/group-history.dao.js";
 
 type Ack = (response: unknown) => void;
 
@@ -156,6 +157,19 @@ export function registerGroupSocket(io: Server): void {
           }
 
           io.to(groupCode).emit("group-message", result.message);
+          // Mirror into the 6h shared history, same as the HTTP path. A history
+          // failure must never lose an accepted live message.
+          try {
+            await recordHistory(
+              groupCode,
+              instanceId,
+              result.message.type as HistoryEntryType,
+              null,
+              summaryText,
+            );
+          } catch (err) {
+            console.error("recordHistory failed for", groupCode, err);
+          }
           ack?.({ success: true, message: result.message });
         } catch (error) {
           console.error("group-message error:", error);

@@ -86,7 +86,11 @@ export async function joinGroupController(req: Request, res: Response) {
         .status(400)
         .json({ message: "groupCode and joinerInstanceId are required" });
     }
-
+   if (typeof groupCode !== "string" || typeof joinerInstanceId !== "string") {
+      return res
+        .status(400)
+        .json({ message: "groupCode and joinerInstanceId must be strings" });
+    }
     // 2. Check active session
     const alreadyActive = await isInstanceInActiveSession(joinerInstanceId);
     if (alreadyActive) {

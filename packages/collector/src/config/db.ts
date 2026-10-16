@@ -36,6 +36,10 @@ export function initSchema() {
       environment TEXT,
       created_at INTEGER NOT NULL,
       request_body TEXT,
+      response_body TEXT,
+      response_headers TEXT,
+      response_truncated INTEGER,
+      response_size INTEGER,
       query_params TEXT,
       request_headers TEXT,  
       expires_at INTEGER

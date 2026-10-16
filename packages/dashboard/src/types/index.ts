@@ -9,6 +9,13 @@ export interface Trace {
   environment: string;
   created_at: number;
   expires_at: number;
+  request_body?: string | null;
+  query_params?: string | null;
+  request_headers?: string | null;
+  response_body?: string | null;
+  response_headers?: string | null;
+  response_truncated?: number | null;
+  response_size?: number | null;
 }
 
 export interface TraceEvent {

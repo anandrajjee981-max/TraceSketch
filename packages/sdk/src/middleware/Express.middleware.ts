@@ -18,14 +18,70 @@ function getInstanceCredentials() {
     return null;
   }
 }
+const MAX_RESPONSE_CAPTURE = 100000; // 100kb, matches collector's limit
+
 export function expressmiddleware(req:Request,res:Response,next:NextFunction){
     if (req.headers['x-tracesketch-cli'] === 'true') {
       next();
       return;
     }
 
-    // STEP 1: Request shuru hote hi note karo
+    // STEP 1:note the start time of the request
     const startTime = Date.now();
+
+    // Capture the outgoing response so the finish handler can report it.
+    // res.locals is only populated here, by wrapping res.json / res.send.
+    let responseCaptured = false;
+    const captureResponse = (payload: unknown) => {
+      if (responseCaptured) return;
+      responseCaptured = true;
+      try {
+        let serialized: string;
+        if (typeof payload === 'string') {
+          serialized = payload;
+        } else if (Buffer.isBuffer(payload)) {
+          serialized = payload.toString('utf8');
+        } else if (payload === undefined || payload === null) {
+          serialized = '';
+        } else {
+          serialized = JSON.stringify(payload);
+        }
+
+        // Cap by bytes (not chars) so multibyte responses never exceed the
+        // collector's 100kb limit.
+        let buf = Buffer.from(serialized, 'utf8');
+        if (buf.length > MAX_RESPONSE_CAPTURE) {
+          buf = buf.subarray(0, MAX_RESPONSE_CAPTURE);
+          res.locals.responseTruncated = true;
+        } else {
+          res.locals.responseTruncated = false;
+        }
+
+        let stored = buf.toString('utf8');
+        // Cutting a multibyte char at the byte boundary can re-expand when the
+        // replacement char is re-encoded, so trim until the string fits.
+        while (Buffer.byteLength(stored, 'utf8') > MAX_RESPONSE_CAPTURE) {
+          stored = stored.slice(0, -1);
+        }
+        res.locals.responseBody = stored;
+        res.locals.responseSize = Buffer.byteLength(stored, 'utf8');
+      } catch (err) {
+        res.locals.responseBody = undefined;
+        res.locals.responseSize = undefined;
+        res.locals.responseTruncated = undefined;
+      }
+    };
+
+    const originalJson = res.json.bind(res);
+    const originalSend = res.send.bind(res);
+    (res as any).json = (payload?: unknown) => {
+      captureResponse(payload);
+      return originalJson(payload as any);
+    };
+    (res as any).send = (payload?: unknown) => {
+      captureResponse(payload);
+      return originalSend(payload as any);
+    };
 
     res.on('finish', () => {
       try {
@@ -49,8 +105,15 @@ export function expressmiddleware(req:Request,res:Response,next:NextFunction){
             duration: duration,
             request_headers: req.headers,
       request_body: req.body,
-      query_params: req.query
+      query_params: req.query,
+      response_body: res.locals.responseBody,
+      response_headers: res.getHeaders(),
+      response_truncated: res.locals.responseTruncated,
+      response_size: res.locals.responseSize,
           })
+
+
+
         }).then(async (r) => {
           if (!r.ok) {
             const body = await r.text().catch(() => '');

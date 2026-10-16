@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getTrace, getTimeline, replayTrace, createRegression, getRegressions, runRegression } from "../api/client";
-import type { Trace, TraceEvent, RegressionTest } from "../types";
+import { getTrace, getTimeline, replayTrace, createRegression, getRegressions, runRegression, getInstanceSecret, getReplaysForTrace } from "../api/client";
+import type { Trace, TraceEvent, RegressionTest, ReplayRun } from "../types";
 import { StatusBadge, ResultBadge } from "../components/StatusBadge";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { SkeletonDetail } from "../components/Skeleton";
 import { Timeline } from "../components/Timeline";
 import { ErrorState, EmptyState } from "../components/EmptyState";
-import { Badge, Field, InlineError, InlineSuccess, MetaPill, TableWrap } from "../components/ui";
-import { absoluteTime } from "../lib/format";
+import { Badge, CodeBlock, Field, InlineError, InlineSuccess, MetaPill, TableWrap } from "../components/ui";
+import { absoluteTime, relativeTime } from "../lib/format";
 import { useConfig } from "../context/ConfigContext";
 import { useTraceSimulator } from "../context/TraceSimulatorContext";
 
@@ -20,29 +20,120 @@ const EVENT_TYPE_TONE: Record<string, string> = {
   queue: "var(--amber)",
 };
 
+/* ─── Stored-field helpers ─── */
+
+// Collector columns are JSON-encoded strings (or NULL). Pretty-print bodies,
+// fall back to the raw string for non-JSON payloads (HTML, plain text).
+function prettyBody(raw: string | null | undefined): string | null {
+  if (raw == null || raw === "") return null;
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
+}
+
+// Parse a JSON-object column (headers / query params) into displayable rows.
+function parseRecord(raw: string | null | undefined): Array<[string, string]> | null {
+  if (raw == null || raw === "") return null;
+  try {
+    const obj = JSON.parse(raw) as unknown;
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      const entries = Object.entries(obj as Record<string, unknown>);
+      if (entries.length === 0) return null;
+      return entries.map(([k, v]) => [k, Array.isArray(v) ? v.join(", ") : String(v ?? "")]);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function formatBytes(n: number | null | undefined): string {
+  if (n == null) return "—";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function KeyValueTable({ rows }: { rows: Array<[string, string]> }) {
+  return (
+    <TableWrap>
+      <table className="ts-table">
+        <thead>
+          <tr>
+            <th scope="col">Key</th>
+            <th scope="col">Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([k, v]) => (
+            <tr key={k}>
+              <td className="ts-mono text-[12px] text-[var(--text-primary)] whitespace-nowrap">{k}</td>
+              <td className="ts-mono text-[12px] text-[var(--text-secondary)] break-all">{v}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </TableWrap>
+  );
+}
+
 function Section({
   title,
   subtitle,
   actions,
   children,
   index,
+  defaultOpen = true,
 }: {
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
   index: number;
+  defaultOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <section className="ts-card ts-stagger" style={{ ["--stagger-i" as string]: index }}>
-      <div className="ts-card-header">
-        <div className="min-w-0">
-          <div className="ts-card-title">{title}</div>
-          {subtitle && <div className="ts-card-subtitle">{subtitle}</div>}
+      <div
+        className="ts-card-header cursor-pointer select-none"
+        onClick={() => setOpen((v) => !v)}
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen((v) => !v);
+          }
+        }}
+      >
+        <div className="min-w-0 flex items-center gap-2">
+          <span
+            aria-hidden="true"
+            className="inline-block text-[11px] transition-transform shrink-0"
+            style={{ color: "var(--text-dim)", transform: open ? "rotate(90deg)" : "none" }}
+          >
+            ▶
+          </span>
+          <div className="min-w-0">
+            <div className="ts-card-title">{title}</div>
+            {subtitle && <div className="ts-card-subtitle">{subtitle}</div>}
+          </div>
         </div>
-        {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+        {actions && (
+          <div
+            className="flex items-center gap-2 shrink-0"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            {actions}
+          </div>
+        )}
       </div>
-      {children}
+      {open && children}
     </section>
   );
 }
@@ -81,6 +172,11 @@ export function TraceDetail() {
   const [regressions, setRegressions] = useState<RegressionTest[]>([]);
   const [loadingRegressions, setLoadingRegressions] = useState(false);
   const [regListError, setRegListError] = useState<string | null>(null);
+
+  // Replay history states
+  const [replays, setReplays] = useState<ReplayRun[]>([]);
+  const [loadingReplays, setLoadingReplays] = useState(false);
+  const [replaysError, setReplaysError] = useState<string | null>(null);
 
   // Per-row run states
   const [runForms, setRunForms] = useState<
@@ -137,7 +233,7 @@ export function TraceDetail() {
     }
     setAddEventSaving(true);
     try {
-      const secret = (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_INSTANCE_SECRET ?? "secret_placeholder_12345";
+      const secret = getInstanceSecret();
       const base = apiBaseUrl.replace(/\/$/, "");
       const url = base ? `${base}/traces/${encodeURIComponent(decodedId)}/events` : `/traces/${encodeURIComponent(decodedId)}/events`;
       const res = await fetch(url, {
@@ -252,9 +348,24 @@ export function TraceDetail() {
     };
   }, [decodedId, instanceId, apiBaseUrl, simulatedTraces, getEventsForTrace]);
 
+  const fetchReplays = async () => {
+    if (!decodedId) return;
+    setLoadingReplays(true);
+    setReplaysError(null);
+    try {
+      const res = await getReplaysForTrace(decodedId, { instanceId, apiBaseUrl });
+      setReplays(res.replays ?? []);
+    } catch (e) {
+      setReplaysError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingReplays(false);
+    }
+  };
+
   useEffect(() => {
     if (!decodedId) return;
     fetchRegressions();
+    fetchReplays();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [decodedId, instanceId, apiBaseUrl]);
 
@@ -272,6 +383,7 @@ export function TraceDetail() {
       const res = await replayTrace(trace.trace_id, trimmed, { instanceId, apiBaseUrl });
       setReplayResult({ original: res.original, replay: res.replay });
       setReplayError(null);
+      void fetchReplays();
     } catch (err) {
       if (trace.trace_id.startsWith("tr_sim_") || trace.trace_id.startsWith("tr_live_")) {
         // Dev simulator mock replay response
@@ -410,6 +522,13 @@ export function TraceDetail() {
       </div>
     );
   }
+
+  const responseBodyPretty = prettyBody(trace.response_body);
+  const responseHeadersRows = parseRecord(trace.response_headers);
+  const requestBodyPretty = prettyBody(trace.request_body);
+  const requestHeadersRows = parseRecord(trace.request_headers);
+  const queryParamsRows = parseRecord(trace.query_params);
+  const hasRequestDetail = requestBodyPretty != null || requestHeadersRows != null || queryParamsRows != null;
 
   return (
     <div className="space-y-4">
@@ -565,11 +684,140 @@ export function TraceDetail() {
         </div>
       </Section>
 
+      {/* ── Response ── */}
+      <Section
+        title="Response"
+        subtitle="What the server sent back for this trace"
+        index={1}
+        actions={
+          <>
+            <MetaPill label="Size" value={<span className="ts-mono ts-numeric">{formatBytes(trace.response_size)}</span>} />
+            {trace.response_truncated ? <Badge tone="neutral">truncated</Badge> : null}
+          </>
+        }
+      >
+        <div className="ts-card-body space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="ts-overline">Status</span>
+            <StatusBadge code={trace.status_code} />
+          </div>
+          {responseBodyPretty != null ? (
+            <CodeBlock code={responseBodyPretty} label="response_body" />
+          ) : (
+            <EmptyState
+              title="No response body captured"
+              description="The SDK records bodies sent via res.json / res.send. Streaming, piped, or pre-fix SDK responses have no stored body."
+            />
+          )}
+          {responseHeadersRows != null && (
+            <div className="space-y-2">
+              <div className="ts-overline">Response headers</div>
+              <KeyValueTable rows={responseHeadersRows} />
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* ── Request ── */}
+      <Section
+        title="Request"
+        subtitle="Headers, query params, and body as captured by the SDK"
+        index={2}
+        actions={<Badge tone="neutral">{trace.method.toUpperCase()}</Badge>}
+      >
+        <div className="ts-card-body space-y-3">
+          {queryParamsRows != null && (
+            <div className="space-y-2">
+              <div className="ts-overline">Query params</div>
+              <KeyValueTable rows={queryParamsRows} />
+            </div>
+          )}
+          {requestBodyPretty != null ? (
+            <CodeBlock code={requestBodyPretty} label="request_body" />
+          ) : (
+            <EmptyState
+              title="No request body captured"
+              description="Empty for GET-style requests, or the SDK ran before the JSON body parser."
+            />
+          )}
+          {requestHeadersRows != null && (
+            <div className="space-y-2">
+              <div className="ts-overline">Request headers</div>
+              <KeyValueTable rows={requestHeadersRows} />
+            </div>
+          )}
+          {!hasRequestDetail && (
+            <div className="text-[11px]" style={{ color: "var(--text-dim)" }}>
+              No request detail stored for this trace.
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* ── Replay history ── */}
+      <Section
+        title="Replay History"
+        subtitle="Every re-execution of this trace"
+        index={3}
+        actions={<Badge tone="neutral">{replays.length} run{replays.length !== 1 ? "s" : ""}</Badge>}
+      >
+        {loadingReplays ? (
+          <div className="ts-card-body">
+            <div className="h-[18px] w-[120px] rounded skeleton-shimmer" />
+            <div className="mt-3 h-[40px] rounded skeleton-shimmer" />
+          </div>
+        ) : replaysError ? (
+          <div className="ts-card-body">
+            <InlineError>{replaysError}</InlineError>
+          </div>
+        ) : replays.length === 0 ? (
+          <EmptyState title="No replays yet" description="Use “▶ Replay” above to re-send this request to a target server." />
+        ) : (
+          <TableWrap>
+            <table className="ts-table">
+              <thead>
+                <tr>
+                  <th scope="col">Target Base URL</th>
+                  <th scope="col">Replay Status</th>
+                  <th scope="col">Latency</th>
+                  <th scope="col">Result</th>
+                  <th scope="col">Executed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {replays.map((r, i) => (
+                  <tr key={r.id} className="ts-stagger" style={{ ["--stagger-i" as string]: Math.min(i, 8) }}>
+                    <td className="ts-mono text-[12px] max-w-[220px] truncate text-[var(--text-secondary)]" title={r.target_base_url}>
+                      {r.target_base_url}
+                    </td>
+                    <td className="whitespace-nowrap">
+                      {r.status_code != null ? <StatusBadge code={r.status_code} /> : <span style={{ color: "var(--text-dim)" }}>—</span>}
+                    </td>
+                    <td className="whitespace-nowrap ts-mono text-[12px] ts-numeric text-[var(--text-secondary)]">
+                      {r.duration_ms != null ? `${r.duration_ms} ms` : "—"}
+                    </td>
+                    <td className="whitespace-nowrap">
+                      <ResultBadge
+                        status={r.result === "completed" ? "success" : r.result === "failed" ? "fail" : "neutral"}
+                        label={r.result ?? "—"}
+                      />
+                    </td>
+                    <td className="whitespace-nowrap text-[12px] text-[var(--text-dim)] ts-mono ts-numeric" title={absoluteTime(r.created_at)}>
+                      {relativeTime(r.created_at)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        )}
+      </Section>
+
       {/* ── Regression tests ── */}
       <Section
         title="Regression Tests"
         subtitle="Saved checks that assert this request keeps its expected status"
-        index={1}
+        index={4}
         actions={<Badge tone="neutral">{regressions.length} test{regressions.length !== 1 ? "s" : ""}</Badge>}
       >
         {loadingRegressions ? (
@@ -680,7 +928,7 @@ export function TraceDetail() {
       )}
 
       {/* ── Events table ── */}
-      <div className="ts-card ts-stagger" style={{ ["--stagger-i" as string]: 3 }}>
+      <div className="ts-card ts-stagger" style={{ ["--stagger-i" as string]: 5 }}>
         <div className="ts-card-header">
           <div>
             <div className="ts-card-title">Events</div>

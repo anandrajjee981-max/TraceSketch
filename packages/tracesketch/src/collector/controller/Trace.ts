@@ -2,6 +2,21 @@ import { Request, Response } from "express";
 import { checkInstanceExists, generateTraceId, insertTrace, getTrace, getAllTraces, checkhashsecret } from "../dao/trace.dao";
 import {redactSensitiveData} from '../utils/redact'
 
+// The SDK serializes the response body before sending it, so parse it back to
+// redact any sensitive values, then re-serialize for storage. Non-JSON bodies
+// are stored verbatim.
+function serializeResponseBody(value: unknown): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'string') {
+    try {
+      return JSON.stringify(redactSensitiveData(JSON.parse(value)));
+    } catch {
+      return value;
+    }
+  }
+  return JSON.stringify(redactSensitiveData(value));
+}
+
 export async function createTrace(req: Request, res: Response) {
   try {
     const instanceId = req.headers['x-instance-id'] as string;
@@ -21,7 +36,10 @@ export async function createTrace(req: Request, res: Response) {
       return res.status(401).json({ message: "Invalid instance secret" });
     }
 
-       const { path, method, status_code, duration, environment, request_body, query_params, request_headers } = req.body;
+       const { path, method, status_code, duration, environment, request_body, query_params, request_headers, response_body, response_headers, response_truncated, response_size } = req.body;
+       if (response_size > 100000) { // 100kb limit
+        return res.status(400).json({ message: "response_size exceeds the limit of 100kb" });
+       }
 
     // Redact sensitive data from headers, body, and queryParams
     const redactedHeaders = redactSensitiveData(request_headers);
@@ -30,6 +48,19 @@ export async function createTrace(req: Request, res: Response) {
        const headersJson = JSON.stringify(redactedHeaders ? redactedHeaders : {});
    const bodyJson = JSON.stringify(redactedBody ? redactedBody : {});
    const queryJson = JSON.stringify(redactedQueryParams ? redactedQueryParams : {});
+
+    // Response side stays serialized; only redact when it is valid JSON.
+    const responseBodyJson = serializeResponseBody(response_body);
+    const responseHeadersJson = response_headers ? JSON.stringify(redactSensitiveData(response_headers)) : null;
+    const responseTruncatedValue = response_truncated ? 1 : 0;
+    // Backfill from the stored body so hand-crafted/old-SDK payloads that omit
+    // response_size don't end up as NULL when we actually have the body.
+    const responseSizeValue =
+      typeof response_size === 'number'
+        ? response_size
+        : responseBodyJson != null
+          ? Buffer.byteLength(responseBodyJson, 'utf8')
+          : null;
 
     if (!path || !method) {
       return res.status(400).json({ message: "method and path are required" });
@@ -52,7 +83,11 @@ export async function createTrace(req: Request, res: Response) {
   queryJson,      // query_params
   headersJson,    // request_headers
   createdAt,
-  expiresAt
+  expiresAt,
+  responseBodyJson,      // response_body
+  responseHeadersJson,   // response_headers
+  responseTruncatedValue, // response_truncated
+  responseSizeValue      // response_size
 );
 
     if (!success) {
