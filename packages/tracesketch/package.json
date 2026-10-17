@@ -1,6 +1,6 @@
 {
   "name": "tracesketch",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "description": "Local-first API tracing, replay, and regression testing",
   "license": "MIT",
   "main": "dist/index.js",

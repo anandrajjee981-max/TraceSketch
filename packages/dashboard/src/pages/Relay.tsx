@@ -274,6 +274,8 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
 
   const feedRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
+  /** JWT token issued by the relay on create/join — sent as socket.io auth so the server accepts the connection. */
+  const relayTokenRef = useRef<string | null>(null);
 
   // ── Scroll feed to bottom ──
   const scrollFeed = useCallback(() => {
@@ -363,7 +365,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
       }
       const socket = io(RELAY_BASE, {
         transports: ["websocket", "polling"],
-        auth: { token: getInstanceSecret() || instanceId },
+        auth: { token: relayTokenRef.current || getInstanceSecret() || instanceId },
         reconnection: true,
         reconnectionAttempts: 10,
         reconnectionDelay: 1000,
@@ -619,7 +621,8 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
         const data = (await res.json().catch(() => ({}))) as { message?: string };
         throw new Error(data.message ?? `HTTP ${res.status}`);
       }
-      const data = (await res.json()) as { groupCode: string };
+      const data = (await res.json()) as { groupCode: string; token?: string };
+      if (data.token) relayTokenRef.current = data.token;
       enterGroup(data.groupCode);
     } catch (e) {
       if (e instanceof TypeError && e.message.includes("fetch")) {
@@ -643,7 +646,8 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
         credentials: "include",
         body: JSON.stringify({ groupCode: joinCode.toUpperCase(), joinerInstanceId: instanceId }),
       });
-      const data = (await res.json().catch(() => ({}))) as { groupCode?: string; message?: string };
+      const data = (await res.json().catch(() => ({}))) as { groupCode?: string; message?: string; token?: string };
+      if (data.token) relayTokenRef.current = data.token;
       if (!res.ok) {
         setJoinError(data.message ?? `Error ${res.status}`);
         return;
