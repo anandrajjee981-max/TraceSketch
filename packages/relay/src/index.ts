@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
-
+import cookie from "cookie-parser";
 import express from "express";
 import http from "http";
 import cors from "cors";
@@ -21,13 +21,16 @@ app.use(cors({ origin: true, credentials: true }));
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:8470",
+    origin: (origin, callback) => {
+      // Allow any origin matching Express cors
+      callback(null, true);
+    },
     methods: ["GET", "POST"],
     credentials: true,
   },
   transports: ["websocket", "polling"], // order matters — websocket priority
-  pingTimeout: 20000, // itne time tak pong na aaye toh disconnect maan lo
-  pingInterval: 25000, // kitni der mein ping bhejna hai
+  pingTimeout: 20000, // wait 20s for pong before considering connection dead
+  pingInterval: 15000, // send ping every 15s (must be < pingTimeout)
   maxHttpBufferSize: 1e6, // 1MB — max message size, DOS se bachne ke liye
   connectionStateRecovery: {
     maxDisconnectionDuration: 2 * 60 * 1000, // temp disconnect pe state recover
@@ -43,9 +46,9 @@ registerGroupSocket(io);
 // path shares no code with the persisted message flow.
 registerCrazyMessageSocket(io);
 
+app.use(cookie());
 app.set("io", io);
 app.use(grouprouter);
-
 async function start() {
   try {
     await connectdb();

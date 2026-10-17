@@ -4,7 +4,7 @@ import { recordHistory } from "../dao/group-history.dao.js";
 
 export async function addMessageController(req: Request, res: Response) {
   try {
-    const groupCode = req.params.code as string;
+    const groupCode = (req.params.code as string)?.trim().toUpperCase();
     const { instanceId, summaryText, type } = req.body;
     const io = req.app.get("io");
 
@@ -63,7 +63,7 @@ export async function addMessageController(req: Request, res: Response) {
 
 export async function getMessagesController(req: Request, res: Response) {
   try {
-    const groupCode = req.params.code as string;
+    const groupCode = (req.params.code as string)?.trim().toUpperCase();
 
     const messages = await getMessages(groupCode);
 

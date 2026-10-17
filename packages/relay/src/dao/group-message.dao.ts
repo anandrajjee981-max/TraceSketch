@@ -30,7 +30,8 @@ export async function addMessage(
     return { ok: false, reason: "invalid_type" };
   }
 
-  const group = await findGroupByCode(groupCode);
+  const normalizedCode = groupCode.trim().toUpperCase();
+  const group = await findGroupByCode(normalizedCode);
 
   if (!group) {
     return { ok: false, reason: "not_found" };
@@ -54,7 +55,7 @@ export async function addMessage(
     ok: true,
     message: {
       id: saved._id.toString(),
-      groupCode,
+      groupCode: normalizedCode,
       instanceId,
       summaryText: saved.summaryText,
       type,
@@ -64,7 +65,8 @@ export async function addMessage(
 }
 
 export async function getMessages(groupCode: string): Promise<StoredMessage[] | null> {
-  const group = await findGroupByCode(groupCode);
+  const normalizedCode = groupCode.trim().toUpperCase();
+  const group = await findGroupByCode(normalizedCode);
 
   if (!group) {
     return null;

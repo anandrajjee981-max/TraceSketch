@@ -3,7 +3,9 @@ import { getGroupRole } from "../dao/group.dao.js";
 
 type Ack = (response: unknown) => void;
 
-const MAX_CRAZY_LENGTH = 4000;
+const MAX_CRAZY_LENGTH = 2048; // 2 KB payload cap
+const CRAZY_RATE_LIMIT = 100;  // 100 messages per second per socket
+const CRAZY_WINDOW_MS = 1000;
 
 /**
  * Ephemeral ("crazy") message path — a completely separate code path from the
@@ -23,12 +25,33 @@ const MAX_CRAZY_LENGTH = 4000;
  */
 export function registerCrazyMessageSocket(io: Server): void {
   io.on("connection", (socket: Socket) => {
+    // Sliding-window rate limiter: 100 messages per second per socket.
+    const messageTimes: number[] = [];
+
+    const isRateLimited = (): boolean => {
+      const now = Date.now();
+      // Drop timestamps outside the 1-second window.
+      while (messageTimes.length > 0 && now - messageTimes[0] >= CRAZY_WINDOW_MS) {
+        messageTimes.shift();
+      }
+      if (messageTimes.length >= CRAZY_RATE_LIMIT) {
+        return true;
+      }
+      messageTimes.push(now);
+      return false;
+    };
+
     socket.on(
       "crazy-message",
       async (
         payload: { groupCode?: string; instanceId?: string; text?: string },
         ack?: Ack,
       ) => {
+        // Rate limit check first.
+        if (isRateLimited()) {
+          return ack?.({ success: false, code: "RATE_LIMITED", message: "Too many crazy messages. Slow down." });
+        }
+
         const groupCode = payload?.groupCode?.trim().toUpperCase();
         const instanceId = payload?.instanceId?.trim();
         const text = payload?.text?.trim();
@@ -47,6 +70,7 @@ export function registerCrazyMessageSocket(io: Server): void {
           return fail("BAD_REQUEST", "text is required");
         }
 
+        // 2 KB payload cap.
         if (text.length > MAX_CRAZY_LENGTH) {
           return fail("TOO_LONG", `Message too long (max ${MAX_CRAZY_LENGTH} characters)`);
         }
@@ -73,5 +97,9 @@ export function registerCrazyMessageSocket(io: Server): void {
         }
       },
     );
+
+    socket.on("disconnect", () => {
+      // messageTimes is scoped to this socket, GC'd on disconnect.
+    });
   });
 }

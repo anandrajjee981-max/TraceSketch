@@ -536,7 +536,6 @@ body {
 /* Select styling override */
 select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' stroke='%230A0A0C' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
   padding-right: 28px !important;
@@ -924,6 +923,146 @@ select {
 .ts-textarea:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+/* Form select elements & options: ensure visible contrast in both light and dark mode */
+.ts-select {
+  color-scheme: light dark;
+}
+.ts-select option {
+  background-color: #ffffff;
+  color: #0a0a0c;
+}
+.dark .ts-select {
+  color-scheme: dark;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #e9edf5;
+}
+.dark .ts-select option {
+  background-color: #141622;
+  color: #e9edf5;
+}
+
+/* ─── Filter Dropdown (Custom Select) ─────────────────────────────────── */
+.ts-filter-container {
+  position: relative;
+  display: inline-block;
+}
+
+.ts-filter-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: var(--stroke) solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+.ts-filter-trigger:hover {
+  box-shadow: var(--shadow-md);
+  transform: translate(-1px, -1px);
+}
+.ts-filter-trigger:focus-visible,
+.ts-filter-trigger[aria-expanded="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light), var(--shadow-sm);
+}
+.ts-filter-trigger[data-active="true"] {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent-text);
+}
+.dark .ts-filter-trigger {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #e9edf5;
+}
+.dark .ts-filter-trigger:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+.dark .ts-filter-trigger[data-active="true"] {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: var(--accent);
+  color: #c7d2fe;
+}
+
+.ts-filter-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  min-width: 100%;
+  width: max-content;
+  max-width: 260px;
+  padding: 5px;
+  background: #ffffff;
+  border: var(--stroke) solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.dark .ts-filter-menu {
+  background: #141622;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.75), 0 4px 12px -2px rgba(0, 0, 0, 0.5);
+}
+
+.ts-filter-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.ts-filter-item:hover,
+.ts-filter-item:focus-visible {
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+  outline: none;
+}
+.dark .ts-filter-item {
+  color: #e9edf5;
+}
+.dark .ts-filter-item:hover,
+.dark .ts-filter-item:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+.ts-filter-item[aria-selected="true"] {
+  background: var(--accent-light);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.dark .ts-filter-item[aria-selected="true"] {
+  background: rgba(99, 102, 241, 0.24);
+  color: #e0e7ff;
 }
 .ts-input-mono {
   font-family: "JetBrains Mono", ui-monospace, monospace;

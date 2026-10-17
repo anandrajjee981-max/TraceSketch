@@ -9,6 +9,7 @@ import {
   markGroupJoined,
   setGroupMembership,
   deleteGroupHistory,
+  getInstanceSecret,
   type GroupHistoryRow,
 } from "../api/client";
 import { ErrorState } from "../components/EmptyState";
@@ -287,7 +288,9 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
   const fetchHistory = useCallback(
     async (code: string) => {
       try {
-        const res = await fetch(`${RELAY_BASE}/group/${code}/messages`);
+        const res = await fetch(`${RELAY_BASE}/group/${code}/messages`, {
+          credentials: "include",
+        });
         if (res.ok) {
           const data = (await res.json()) as { messages: RelayMessage[] };
           setMessages((prev) => mergeMessages(prev, data.messages ?? []));
@@ -358,12 +361,25 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
       if (socketRef.current) {
         socketRef.current.disconnect();
       }
-      const socket = io(RELAY_BASE, { transports: ["websocket", "polling"] });
+      const socket = io(RELAY_BASE, {
+        transports: ["websocket", "polling"],
+        auth: { token: getInstanceSecret() || instanceId },
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 10000,
+      });
       socketRef.current = socket;
 
-      socket.on("connect", () => {
+      const joinRoom = () => {
         socket.emit("join-room", { groupCode: code, instanceId });
-      });
+      };
+
+      if (socket.connected) {
+        joinRoom();
+      }
+      socket.on("connect", joinRoom);
 
       socket.on("group-message", (msg: RelayMessage) => {
         // Live behaviour, unchanged.
@@ -596,6 +612,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
       const res = await fetch(`${RELAY_BASE}/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ creatorInstanceId: instanceId }),
       });
       if (!res.ok) {
@@ -623,6 +640,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
       const res = await fetch(`${RELAY_BASE}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ groupCode: joinCode.toUpperCase(), joinerInstanceId: instanceId }),
       });
       const data = (await res.json().catch(() => ({}))) as { groupCode?: string; message?: string };
@@ -672,6 +690,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
       const res = await fetch(`${RELAY_BASE}/group/${groupCode}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ instanceId, summaryText: text, type: messageType }),
       });
       if (!res.ok) {
@@ -734,6 +753,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
       const res = await fetch(`${RELAY_BASE}/group/${groupCode}/leave`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ instanceId }),
       });
       const data = (await res.json().catch(() => ({}))) as { message?: string };

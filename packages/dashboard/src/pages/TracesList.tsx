@@ -4,6 +4,7 @@ import { getTraces } from "../api/client";
 import type { Trace } from "../types";
 import { StatusBadge } from "../components/StatusBadge";
 import { Pagination } from "../components/Pagination";
+import { FilterDropdown, type FilterOption } from "../components/FilterDropdown";
 import { SkeletonTable } from "../components/Skeleton";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { EmptyState, ErrorState, IconEmptyTraces, IconNoResults } from "../components/EmptyState";
@@ -189,7 +190,36 @@ export function TracesList() {
     }
   }
 
-  const methods = useMemo(() => Array.from(new Set(allTraces.map((t) => t.method.toUpperCase()))).sort(), [allTraces]);
+  // Distinct methods across the trace list for the filter dropdown.
+  // Standard HTTP methods (GET, POST, PUT, PATCH, DELETE) are included so
+  // filtering by methods like POST is always available even before traces arrive.
+  const methods = useMemo(() => {
+    const common = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+    const found = allTraces.map((t) => t.method?.toUpperCase()).filter(Boolean);
+    return Array.from(new Set([...common, ...found]));
+  }, [allTraces]);
+
+  const methodOptions: FilterOption[] = useMemo(
+    () => [
+      { value: "all", label: "All methods" },
+      ...methods.map((m) => ({
+        value: m,
+        label: m,
+        badge: <MethodBadge method={m} />,
+      })),
+    ],
+    [methods]
+  );
+
+  const statusOptions: FilterOption[] = useMemo(
+    () => [
+      { value: "all", label: "All statuses" },
+      { value: "2xx", label: "2xx Success", dotColor: "var(--green)" },
+      { value: "4xx", label: "4xx Client Error", dotColor: "var(--amber)" },
+      { value: "5xx", label: "5xx Server Error", dotColor: "var(--red)" },
+    ],
+    []
+  );
 
   const summary = useMemo(() => {
     const errCount = filtered.filter((t) => t.status_code >= 400).length;
@@ -292,31 +322,21 @@ export function TracesList() {
         <div className="ts-toolbar">
           <SearchInput value={q} onChange={updateQ} placeholder="Filter by trace ID or route (e.g. /api/checkout)…" />
 
-          <select
+          <FilterDropdown
             value={methodFilter}
-            onChange={(e) => updateMethod(e.target.value)}
-            aria-label="Filter by HTTP method"
-            className="ts-select !w-auto min-w-[124px]"
-          >
-            <option value="all">All methods</option>
-            {methods.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
+            onChange={updateMethod}
+            options={methodOptions}
+            ariaLabel="Filter by HTTP method"
+            className="min-w-[136px]"
+          />
 
-          <select
+          <FilterDropdown
             value={statusFilter}
-            onChange={(e) => updateStatus(e.target.value)}
-            aria-label="Filter by status code"
-            className="ts-select !w-auto min-w-[140px]"
-          >
-            <option value="all">All statuses</option>
-            <option value="2xx">2xx Success</option>
-            <option value="4xx">4xx Client Error</option>
-            <option value="5xx">5xx Server Error</option>
-          </select>
+            onChange={updateStatus}
+            options={statusOptions}
+            ariaLabel="Filter by status code"
+            className="min-w-[150px]"
+          />
 
           {filtersActive && (
             <button
