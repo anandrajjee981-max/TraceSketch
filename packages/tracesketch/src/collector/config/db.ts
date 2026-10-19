@@ -29,6 +29,7 @@ export function initSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       trace_id TEXT UNIQUE NOT NULL,
       instance_id TEXT NOT NULL,
+      repo TEXT,
       method TEXT NOT NULL,
       path TEXT NOT NULL,
       status_code INTEGER,
@@ -112,6 +113,19 @@ CREATE TABLE IF NOT EXISTS group_membership (
   updated_at INTEGER NOT NULL
 );
 
+-- Auto-generated OpenAPI specs. One row per generated document; the raw spec is
+-- kept as JSON text in the content column so the dashboard can render it without
+-- a second round trip.
+CREATE TABLE IF NOT EXISTS OPENAPI_DOCS(
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  version TEXT NOT NULL,
+  base_url TEXT NOT NULL,
+  repo TEXT,
+  content TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
   `);
 
   // Migrations for databases created before the response columns existed.
@@ -133,6 +147,32 @@ CREATE TABLE IF NOT EXISTS group_membership (
       db.exec(`ALTER TABLE traces ADD COLUMN ${columnName} ${columnType}`);
       console.log(`Migrated traces: added ${columnName} column`);
     }
+  }
+
+  // Migrations for databases created before the repo / OpenAPI docs feature.
+  // CREATE TABLE IF NOT EXISTS is a no-op on existing tables, so the columns
+  // have to be added explicitly or older installs never get them.
+  if (!traceColumns.includes('repo')) {
+    db.exec('ALTER TABLE traces ADD COLUMN repo TEXT');
+    console.log('Migrated traces: added repo column');
+  }
+
+  const openapiColumns = db
+    .pragma('table_info(OPENAPI_DOCS)')
+    .map((column: { name: string }) => column.name);
+
+  if (!openapiColumns.includes('repo')) {
+    db.exec('ALTER TABLE OPENAPI_DOCS ADD COLUMN repo TEXT');
+  }
+
+  // One OpenAPI doc per repo. SQLite permits many NULLs under a UNIQUE index,
+  // so docs without a repo (older captures) never collide. Best-effort: an
+  // install that already accumulated duplicate repos keeps working via the
+  // upsert path, and the index simply isn't created until those are cleaned up.
+  try {
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_openapi_docs_repo ON OPENAPI_DOCS(repo)');
+  } catch (err) {
+    console.warn('[traceSketch] could not create unique repo index on OPENAPI_DOCS:', err);
   }
 
   // Migrations for databases created before source_id / group_membership existed.

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { checkInstanceExists, generateTraceId, insertTrace, getTrace, getAllTraces, checkhashsecret } from "../dao/trace.dao";
+import { saveOpenApiDocFromTrace } from "../dao/openApi";
 import {redactSensitiveData} from '../utils/redact'
 
 // The SDK serializes the response body before sending it, so parse it back to
@@ -36,7 +37,7 @@ export async function createTrace(req: Request, res: Response) {
       return res.status(401).json({ message: "Invalid instance secret" });
     }
 
-       const { path, method, status_code, duration, environment, request_body, query_params, request_headers, response_body, response_headers, response_truncated, response_size } = req.body;
+       const { path, method, status_code, duration, environment, repo, request_body, query_params, request_headers, response_body, response_headers, response_truncated, response_size } = req.body;
        if (response_size > 100000) { // 100kb limit
         return res.status(400).json({ message: "response_size exceeds the limit of 100kb" });
        }
@@ -74,6 +75,7 @@ export async function createTrace(req: Request, res: Response) {
  const success = insertTrace(
   traceId,
   instanceId,
+  repo ?? null,
   method,
   path,
   status_code,
@@ -92,6 +94,34 @@ export async function createTrace(req: Request, res: Response) {
 
     if (!success) {
       return res.status(500).json({ message: "Failed to save trace" });
+    }
+
+    // Auto-generate and save an OpenAPI doc from the captured trace. Best effort:
+    // a failure here must never reject an otherwise-saved trace.
+    try {
+      let responseBodyObj: unknown = null;
+      if (responseBodyJson) {
+        try {
+          responseBodyObj = JSON.parse(responseBodyJson);
+        } catch {
+          responseBodyObj = responseBodyJson;
+        }
+      }
+      saveOpenApiDocFromTrace({
+        traceId,
+        instanceId,
+        repo,
+        method,
+        path,
+        status_code,
+        request_body: redactedBody,
+        query_params: redactedQueryParams,
+        request_headers: redactedHeaders,
+        response_body: responseBodyObj,
+        response_headers: responseHeadersJson ? JSON.parse(responseHeadersJson) : undefined,
+      });
+    } catch (err) {
+      console.error('[traceSketch] openapi doc generation failed (non-fatal)', err);
     }
 
     res.status(200).json({ message: "trace created successfully", trace_id: traceId });

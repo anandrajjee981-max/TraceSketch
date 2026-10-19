@@ -5,13 +5,36 @@
 //   sketch post /api/payment 5000                  → http://localhost:5000/api/payment
 //   sketch post /api/payment http://anan.com        → http://anan.com/api/payment
 //   sketch post /api/payment 5000 --body '{"a":1}'  → with JSON body
+//   sketch secret                                   → show instance id and secret
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 const args = process.argv.slice(2);
 
+if (args.length === 0) {
+  console.error('Usage: sketch <method> <path> <port-or-url> [--body \'{"key":"value"}\']');
+  console.error('       sketch secret');
+  process.exit(1);
+}
+
+const command = args[0];
+
+if (command === 'secret') {
+  const instanceFile = path.join(os.homedir(), '.tracesketch', 'config', 'instance.json');
+  if (!fs.existsSync(instanceFile)) {
+    console.error('No instance credentials found. Run `npx tracesketch start` once to create one.');
+    process.exit(1);
+  }
+  const raw = fs.readFileSync(instanceFile, 'utf-8');
+  const config = JSON.parse(raw);
+  console.log(`instance_id: ${config.instance_id}`);
+  console.log(`secret:      ${config.secret}`);
+  process.exit(0);
+}
+
 if (args.length < 3) {
   console.error('Usage: sketch <method> <path> <port-or-url> [--body \'{"key":"value"}\']');
+  console.error('       sketch secret');
   process.exit(1);
 }
 

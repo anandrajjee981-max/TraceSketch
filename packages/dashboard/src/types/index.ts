@@ -86,3 +86,20 @@ export interface RegressionRunResult {
   actual_status: number;
   passed?: boolean;
 }
+
+// ---- OpenAPI Docs ----
+
+export interface OpenApiDoc {
+  id: string;
+  name: string;
+  version: string;
+  base_url: string;
+  repo: string | null;
+  content: string;
+  created_at: number;
+}
+
+export interface OpenApiDocsResponse {
+  message: string;
+  docs: OpenApiDoc[];
+}

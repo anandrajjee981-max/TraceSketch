@@ -306,27 +306,32 @@ export function CodeBlock({
   label,
   copyable = true,
   copyLabel = "Copy",
+  maxHeight,
 }: {
   code: string;
   label?: string;
   copyable?: boolean;
   copyLabel?: string;
+  maxHeight?: string;
 }) {
   return (
     <div
-      className="rounded-[10px] overflow-hidden text-left"
-      style={{ background: "var(--bg-page)", border: "1px solid var(--border)" }}
+      className="rounded-[10px] overflow-hidden text-left flex flex-col"
+      style={{ background: "var(--bg-page)", border: "1px solid var(--border)", ...(maxHeight ? { maxHeight } : {}) }}
     >
       {(label || copyable) && (
         <div
-          className="flex items-center justify-between gap-3 px-3.5 py-2"
+          className="flex items-center justify-between gap-3 px-3.5 py-2 shrink-0"
           style={{ background: "var(--bg-surface-2)", borderBottom: "1px solid var(--border-dim)" }}
         >
           <span className="ts-overline">{label}</span>
           {copyable && <CopyButton value={code} className="btn-ghost !py-1 !px-2 !text-[11px]">{copyLabel}</CopyButton>}
         </div>
       )}
-      <pre className="text-[12px] leading-[20px] font-mono whitespace-pre-wrap break-all p-4 text-[var(--text-secondary)]">
+      <pre
+        className="text-[12px] leading-[20px] font-mono whitespace-pre-wrap break-all p-4 text-[var(--text-secondary)]"
+        style={maxHeight ? { overflow: "auto", minHeight: 0 } : undefined}
+      >
         {code}
       </pre>
     </div>

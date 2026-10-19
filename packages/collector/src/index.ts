@@ -6,6 +6,7 @@ import tracerouter from "./routes/trace.routes";
 import replayrouter from "./routes/replay.route";
 import eventsRouter from "./routes/events.routes";
 import regressionrouter from "./routes/regression.route";
+import openapiRouter from "./routes/openapi.routes";
 import cron from 'node-cron';
 import { cleanExpiredTraces } from "./dao/trace.dao";
 import path from 'path';
@@ -52,7 +53,8 @@ app.get("/instance", (_req, res) => {
 app.use("/traces", replayrouter);
 app.use("/traces", regressionrouter);
 app.use("/traces", tracerouter);
-app.use("/traces", eventsRouter); 
+app.use("/traces", eventsRouter);
+app.use("/openapi", openapiRouter); 
 
 cron.schedule('0 */2 * * *', () => {
   console.log('Running hourly trace cleanup task...');

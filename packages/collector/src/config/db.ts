@@ -29,6 +29,7 @@ export function initSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       trace_id TEXT UNIQUE NOT NULL,
       instance_id TEXT NOT NULL,
+      repo TEXT,
       method TEXT NOT NULL,
       path TEXT NOT NULL,
       status_code INTEGER,
@@ -76,8 +77,8 @@ expected_status INTEGER,
 expected_schema TEXT,
 created_at INTEGER NOT NULL,
 FOREIGN KEY (source_trace_id) REFERENCES traces(trace_id) ON DELETE CASCADE
-)
-CREATE TABLE group_sessions (
+);
+CREATE TABLE IF NOT EXISTS group_sessions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   group_code TEXT UNIQUE NOT NULL,      
   creator_instance_id TEXT NOT NULL,     
@@ -94,9 +95,67 @@ CREATE TABLE IF NOT EXISTS group_history (
   trace_id TEXT,
   data TEXT,             
   saved_at INTEGER NOT NULL
-)
+);
+
+CREATE TABLE IF NOT EXISTS OPENAPI_DOCS(
+id TEXT PRIMARY KEY,
+name TEXT NOT NULL,
+version TEXT NOT NULL,
+base_url TEXT NOT NULL,
+repo TEXT,
+content TEXT NOT NULL,
+created_at INTEGER NOT NULL
+
+);
+CREATE TABLE IF NOT EXISTS Openapi_paths(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+openapi_doc_id INTEGER NOT NULL,
+path TEXT NOT NULL,
+FOREIGN KEY (openapi_doc_id) REFERENCES OPENAPI_DOCS(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS Openapi_operations(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+openapi_path_id INTEGER NOT NULL,
+method TEXT NOT NULL,
+operation_id TEXT NOT NULL,
+summary TEXT,
+description TEXT,
+parameters TEXT,
+request_body TEXT,
+responses TEXT,
+FOREIGN KEY (openapi_path_id) REFERENCES Openapi_paths(id) ON DELETE CASCADE
+) 
 
   `);
+
+  // Migration: add repo column to traces for existing databases
+  try {
+    const traceColumns = db
+      .pragma('table_info(traces)')
+      .map((column: { name: string }) => column.name);
+    if (!traceColumns.includes('repo')) {
+      db.exec('ALTER TABLE traces ADD COLUMN repo TEXT');
+    }
+  } catch {}
+
+  // Migration: add repo column to OPENAPI_DOCS for existing databases
+  try {
+    const openapiColumns = db
+      .pragma('table_info(OPENAPI_DOCS)')
+      .map((column: { name: string }) => column.name);
+    if (!openapiColumns.includes('repo')) {
+      db.exec('ALTER TABLE OPENAPI_DOCS ADD COLUMN repo TEXT');
+    }
+  } catch {}
+
+  // One OpenAPI doc per repo. SQLite permits many NULLs under a UNIQUE index, so
+  // docs without a repo never collide. Best-effort so an install that already
+  // holds duplicate repos still boots; the dao upsert keeps writes unique.
+  try {
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_openapi_docs_repo ON OPENAPI_DOCS(repo)');
+  } catch (err) {
+    console.warn('[traceSketch] could not create unique repo index on OPENAPI_DOCS:', err);
+  }
 
   const regressionColumns = db
     .pragma('table_info(regression_tests)')

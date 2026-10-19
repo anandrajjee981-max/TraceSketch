@@ -1,4 +1,4 @@
-import type { TracesResponse, TraceResponse, TimelineResponse, ReplaysResponse, ReplayResult, RegressionsResponse, RegressionRunResult } from "../types";
+import type { TracesResponse, TraceResponse, TimelineResponse, ReplaysResponse, ReplayResult, RegressionsResponse, RegressionRunResult, OpenApiDoc, OpenApiDocsResponse } from "../types";
 
 // Base is read at runtime: VITE_COLLECTOR_URL="" -> use relative via Vite proxy; else absolute.
 function getApiBase(): string {
@@ -136,6 +136,41 @@ export function getAllRegressions(opts?: { instanceId?: string; apiBaseUrl?: str
   return fetchJson<RegressionsResponse>(apiUrl(`/traces/regressions${q}`, opts?.apiBaseUrl), opts?.instanceId);
 }
 
+// ---- OpenAPI Docs ----
+
+export function getOpenApiDocs(opts?: { instanceId?: string; apiBaseUrl?: string; repo?: string }): Promise<OpenApiDocsResponse> {
+  const params = new URLSearchParams();
+  if (opts?.repo) params.set("repo", opts.repo);
+  const q = params.toString() ? `?${params.toString()}` : "";
+  return fetchJson<OpenApiDocsResponse>(apiUrl(`/openapi${q}`, opts?.apiBaseUrl), opts?.instanceId);
+}
+
+export function getOpenApiDoc(id: string, opts?: { instanceId?: string; apiBaseUrl?: string }): Promise<OpenApiDoc> {
+  return fetchJson<OpenApiDoc>(apiUrl(`/openapi/${encodeURIComponent(id)}`, opts?.apiBaseUrl), opts?.instanceId);
+}
+
+export async function deleteOpenApiDoc(
+  id: string,
+  opts?: { instanceId?: string; apiBaseUrl?: string }
+): Promise<{ message: string }> {
+  await loadDashboardSession().catch(() => {});
+  const res = await fetch(apiUrl(`/openapi/${encodeURIComponent(id)}`, opts?.apiBaseUrl), {
+    method: "DELETE",
+    headers: headers(opts?.instanceId),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let message = text;
+    try {
+      const parsed = JSON.parse(text) as { message?: string };
+      if (parsed.message) message = parsed.message;
+    } catch {
+      // keep raw text
+    }
+    throw new Error(message || `HTTP ${res.status}: ${res.statusText}`);
+  }
+  return res.json() as Promise<{ message: string }>;
+}
 
 // ---- Regression Tests ----
 export async function createRegression(

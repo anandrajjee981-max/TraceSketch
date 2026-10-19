@@ -3,6 +3,12 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
+export interface TraceSketchOptions {
+  docs?: {
+    repo?: string;
+  };
+}
+
 const INSTANCE_FILE = path.join(os.homedir(), '.tracesketch', 'config', 'instance.json');
 
 function getInstanceCredentials() {
@@ -20,7 +26,10 @@ function getInstanceCredentials() {
 }
 const MAX_RESPONSE_CAPTURE = 100000; // 100kb, matches collector's limit
 
-export function expressmiddleware(req:Request,res:Response,next:NextFunction){
+export function expressmiddleware(options: TraceSketchOptions = {}) {
+  const repo = options?.docs?.repo || 'unknown';
+
+  return function middleware(req:Request,res:Response,next:NextFunction){
     if (req.headers['x-tracesketch-cli'] === 'true') {
       next();
       return;
@@ -104,6 +113,8 @@ export function expressmiddleware(req:Request,res:Response,next:NextFunction){
             path: req.path,
             status_code: statusCode,
             duration: duration,
+            repo: repo,
+            environment: "local",
             request_headers: req.headers,
       request_body: req.body,
       query_params: req.query,
@@ -133,6 +144,7 @@ export function expressmiddleware(req:Request,res:Response,next:NextFunction){
     });
 
     next();
+  };
 }
 
 

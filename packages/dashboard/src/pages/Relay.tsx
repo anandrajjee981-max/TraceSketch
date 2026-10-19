@@ -43,9 +43,9 @@ interface CrazyMessagePayload {
 }
 
 const TYPE_OPTIONS: { value: MessageType; label: string; hint: string }[] = [
-  { value: "note", label: "Note", hint: "Persisted to the relay database" },
-  { value: "trace_share", label: "Trace Share", hint: "Persisted to the relay database" },
-  { value: "replay_result", label: "Replay Result", hint: "Persisted to the relay database" },
+  { value: "note", label: "OpenAPI", hint: "Share an OpenAPI spec or plain text verbatim — the receiver can copy it as-is" },
+  { value: "trace_share", label: "Trace Share", hint: "Share an endpoint or trace link — the receiver can copy it" },
+  { value: "replay_result", label: "Replay Result", hint: "Share a replay result — the receiver can copy it" },
   { value: "crazy", label: "Crazy", hint: "Ephemeral socket broadcast only — never saved to database" },
 ];
 
@@ -193,6 +193,116 @@ function CodeDisplay({ code }: { code: string }) {
         </svg>
         <span>Copy Code</span>
       </CopyButton>
+    </div>
+  );
+}
+
+/** Type label used on a shared card. */
+function shareLabel(type: MessageType | undefined): string {
+  if (type === "trace_share") return "Trace Share";
+  if (type === "replay_result") return "Replay Result";
+  if (type === "crazy") return "Crazy";
+  return "OpenAPI";
+}
+
+/**
+ * A relay payload rendered as a copyable "shared" card.
+ *
+ * Every persisted type (note, trace share, replay result) goes through this one
+ * shape so the receiver always gets the payload in clipboard format: the body is
+ * select-all and a Copy button mirrors it, and any URL in the text is surfaced
+ * as a one-click "open endpoint" link. A trace id, when present, stays a link
+ * into the local trace view.
+ */
+function SharedPayloadCard({
+  type,
+  text,
+  isMe,
+  timestamp,
+  traceId,
+  onOpenTrace,
+}: {
+  type?: MessageType;
+  text: string;
+  isMe: boolean;
+  timestamp: string;
+  traceId?: string | null;
+  onOpenTrace?: (traceId: string) => void;
+}) {
+  const isCrazy = type === "crazy";
+  const url = text.match(/https?:\/\/[^\s"'<>()]+/)?.[0] ?? null;
+
+  return (
+    <div
+      className="flex flex-col gap-2 rounded-[12px] px-3.5 py-2.5 w-full"
+      style={
+        isCrazy
+          ? { border: "1px dashed var(--red-border)", background: "var(--red-bg)", boxShadow: "0 0 12px var(--red-glow)" }
+          : isMe
+          ? { background: "var(--accent-light)", border: "1px solid var(--border-accent)" }
+          : { background: "var(--bg-surface-3)", border: "1px solid var(--border)" }
+      }
+    >
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="ts-chip-neutral !py-0 !px-1.5 !text-[9px]">{shareLabel(type)}</span>
+        <span className="text-[11px] font-medium" style={{ color: isMe ? "var(--text-secondary)" : "var(--accent-text)" }}>
+          {isMe ? "You" : "Peer Developer"}
+        </span>
+        <span className="text-[10px] ts-numeric" style={{ color: "var(--text-dim)" }}>
+          {relativeTime(timestamp)}
+        </span>
+        <CopyButton
+          value={text}
+          className="btn-secondary !py-0.5 !px-2 !text-[10px] ml-auto"
+          copiedLabel="Copied!"
+          title="Copy to clipboard"
+        >
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect x="5" y="5" width="8" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+            <path d="M3 11V3.5A1.5 1.5 0 0 1 4.5 2H11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+          <span>Copy</span>
+        </CopyButton>
+      </div>
+
+      <div
+        className="ts-mono text-[12px] leading-[19px] whitespace-pre-wrap break-all rounded-[8px] px-2.5 py-2 select-all max-h-[220px] overflow-y-auto ts-scroll-fade"
+        style={
+          isCrazy
+            ? { background: "var(--bg-surface-2)", border: "1px solid var(--red-border)", color: "var(--red)" }
+            : { background: "var(--bg-page)", border: "1px solid var(--border)", color: "var(--text-primary)" }
+        }
+      >
+        {text}
+      </div>
+
+      {(url || traceId) && (
+        <div className="flex items-center gap-3 flex-wrap">
+          {url && (
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-[11px] ts-mono underline underline-offset-2 hover:opacity-80"
+              style={{ color: "var(--accent-text)" }}
+              title="Open shared endpoint"
+            >
+              Open endpoint ↗
+            </a>
+          )}
+          {traceId && onOpenTrace && (
+            <button
+              type="button"
+              onClick={() => onOpenTrace(traceId)}
+              className="text-[11px] ts-mono underline underline-offset-2 hover:opacity-80"
+              style={{ color: "var(--accent-text)" }}
+              title="Open trace detail"
+            >
+              {traceId}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1079,46 +1189,15 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
               </div>
             ) : (
               history.map((entry) => (
-                <div
-                  key={historyKey(entry)}
-                  className="flex flex-col gap-1.5 rounded-[12px] px-3.5 py-2.5 ts-chat-in"
-                  style={{ background: "var(--bg-surface-3)", border: "1px solid var(--border)" }}
-                >
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="ts-chip-neutral !py-0 !px-1.5 !text-[9px]">
-                      {entry.entryType === "trace_share"
-                        ? "Trace Share"
-                        : entry.entryType === "replay_result"
-                          ? "Replay Result"
-                          : "Note"}
-                    </span>
-                    <span className="text-[11px] font-medium" style={{ color: entry.instanceId === instanceId ? "var(--text-secondary)" : "var(--accent-text)" }}>
-                      {entry.instanceId === instanceId ? "You" : "Peer Developer"}
-                    </span>
-                    <span className="text-[10px] ts-numeric" style={{ color: "var(--text-dim)" }} title={entry.timestamp}>
-                      {relativeTime(entry.timestamp)}
-                    </span>
-                  </div>
-
-                  <p className="text-[13px] leading-relaxed break-words" style={{ color: "var(--text-primary)" }}>
-                    {entry.summary}
-                  </p>
-
-                  {entry.traceId ? (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/traces/${encodeURIComponent(entry.traceId!)}`)}
-                      className="self-start text-[11px] ts-mono underline underline-offset-2 hover:opacity-80"
-                      style={{ color: "var(--accent-text)" }}
-                      title="Open trace detail"
-                    >
-                      {entry.traceId}
-                    </button>
-                  ) : (
-                    <span className="text-[10px] italic" style={{ color: "var(--text-dim)" }}>
-                      no trace id recorded
-                    </span>
-                  )}
+                <div key={historyKey(entry)} className="ts-chat-in">
+                  <SharedPayloadCard
+                    type={entry.entryType}
+                    text={entry.summary}
+                    isMe={entry.instanceId === instanceId}
+                    timestamp={entry.timestamp}
+                    traceId={entry.traceId}
+                    onOpenTrace={(id) => navigate(`/traces/${encodeURIComponent(id)}`)}
+                  />
                 </div>
               ))
             )}
@@ -1137,7 +1216,7 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
               </div>
               <p className="text-[13px] font-medium text-[var(--text-secondary)]">No messages yet in this group</p>
               <p className="text-[12px] max-w-[280px]">
-                Send a note, share a trace, or test real-time collaboration with your peer.
+                Paste an OpenAPI spec, share a trace, or test real-time collaboration with your peer.
               </p>
             </div>
           ) : (
@@ -1159,48 +1238,22 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
               return (
                 <div
                   key={dedupKey(msg) + i}
-                  className={`flex flex-col gap-1 max-w-[82%] ts-chat-in ${isMe ? "self-end items-end" : "self-start items-start"}`}
+                  className={`flex flex-col max-w-[82%] ts-chat-in ${isMe ? "self-end items-end" : "self-start items-start"}`}
                 >
-                  <div className="flex items-center gap-2 px-1">
-                    <span className="text-[11px] font-medium" style={{ color: isMe ? "var(--text-secondary)" : "var(--accent-text)" }}>
-                      {isMe ? "You" : "Peer Developer"}
+                  {isCrazy && (
+                    <span
+                      className="ts-chip !py-0 !px-1.5 !text-[9px] mb-1"
+                      style={{ color: "var(--red)", background: "var(--red-bg)", border: "1px solid var(--red-border)" }}
+                    >
+                      ephemeral · unsaved
                     </span>
-                    {msg.type && msg.type !== "note" && !isCrazy && (
-                      <span className="ts-chip-neutral !py-0 !px-1.5 !text-[9px]">
-                        {msg.type === "trace_share" ? "Trace Share" : "Replay Result"}
-                      </span>
-                    )}
-                    {isCrazy && (
-                      <span
-                        className="ts-chip !py-0 !px-1.5 !text-[9px]"
-                        style={{ color: "var(--red)", background: "var(--red-bg)", border: "1px solid var(--red-border)" }}
-                      >
-                        ephemeral · unsaved
-                      </span>
-                    )}
-                    <span className="text-[10px] ts-numeric" style={{ color: "var(--text-dim)" }}>
-                      {relativeTime(msg.createdAt)}
-                    </span>
-                  </div>
-
-                  <div
-                    className={`px-3.5 py-2 text-[13px] leading-relaxed break-words ${
-                      isCrazy
-                        ? "border border-dashed rounded-[12px] italic"
-                        : isMe
-                        ? "rounded-[14px] rounded-tr-[3px]"
-                        : "rounded-[14px] rounded-tl-[3px]"
-                    }`}
-                    style={
-                      isCrazy
-                        ? { borderColor: "var(--red-border)", background: "var(--red-bg)", color: "var(--red)", boxShadow: "0 0 12px var(--red-glow)" }
-                        : isMe
-                        ? { background: "var(--accent-light)", border: "1px solid var(--border-accent)", color: "var(--text-primary)" }
-                        : { background: "var(--bg-surface-3)", border: "1px solid var(--border)", color: "var(--text-primary)" }
-                    }
-                  >
-                    {msg.summaryText}
-                  </div>
+                  )}
+                  <SharedPayloadCard
+                    type={isCrazy ? "crazy" : msg.type}
+                    text={msg.summaryText}
+                    isMe={isMe}
+                    timestamp={msg.createdAt}
+                  />
                 </div>
               );
             })
@@ -1232,9 +1285,13 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
               ))}
             </div>
           </div>
-          {messageType === "crazy" && (
+          {messageType === "crazy" ? (
             <span className="text-[10px] italic" style={{ color: "var(--red)" }}>
               temporary — disappears on reload
+            </span>
+          ) : (
+            <span className="text-[10px] italic" style={{ color: "var(--text-dim)" }}>
+              Shift+Enter for newline · Enter to send
             </span>
           )}
         </div>
@@ -1243,17 +1300,30 @@ export function Relay({ embedded = false, onClose, initialSharedText }: RelayPro
         {/* Send input bar */}
         {!showHistory && (
         <div className="px-4 py-3 flex items-center gap-2.5 shrink-0" style={{ background: "var(--bg-surface-2)", borderTop: "1px solid var(--border-dim)" }}>
-          <input
-            type="text"
+          <textarea
             value={messageInput}
             onChange={(e) => {
               setMessageInput(e.target.value);
               if (sendError) setSendError(null);
             }}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-            placeholder={messageType === "crazy" ? "Say something crazy (ephemeral)…" : "Type a message or paste trace context…"}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            rows={1}
+            placeholder={
+              messageType === "crazy"
+                ? "Say something crazy (ephemeral)…"
+                : messageType === "trace_share"
+                ? "Paste an endpoint or trace link — receiver can copy it…"
+                : messageType === "replay_result"
+                ? "Paste the replay result — receiver can copy it…"
+                : "Paste an OpenAPI spec or text — receiver sees it as-is…"
+            }
             aria-label="Message"
-            className="flex-1 ts-input !rounded-full !px-4 !py-2"
+            className="flex-1 ts-input !rounded-[14px] !px-4 !py-2 resize-y ts-mono text-[12.5px] leading-[19px] min-h-[42px] max-h-[220px]"
           />
           <button
             onClick={handleSend}
